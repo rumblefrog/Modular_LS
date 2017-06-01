@@ -7,6 +7,9 @@
 *.obj
 *.elf
 
+# Compiled Plugin
+*.smx
+
 # Linker output
 *.ilk
 *.map
