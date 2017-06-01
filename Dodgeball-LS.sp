@@ -50,6 +50,8 @@ char LSPL_Titles[5][] = {
 //<!-- Main -->
 Database hDB;
 
+bool Verbose;
+
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
 
@@ -93,7 +95,19 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 
 public void OnPluginStart()
 {
+	RegAdminCmd("sm_dls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle console debugging");
+}
+
+public Action CmdToggleDebug(int client, int args)
+{
+	if (!Verbose)
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Enabled verbose logging");
+	else
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Disabled verbose logging");
+		
+	Verbose = !Verbose;
 	
+	return Plugin_Handled;
 }
 
 public void OnClientPostAdminCheck(int client)
@@ -108,7 +122,7 @@ public void OnClientPostAdminCheck(int client)
 	WritePackCell(pData, client);
 	WritePackString(pData, Client_SteamID64);
 	
-	hDB.Query(SQL_OnFetchPlayerData, pData);
+	hDB.Query(SQL_OnFetchPlayerData, Select_Query, pData);
 }
 
 public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
@@ -121,7 +135,7 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	
 	if (results.RowCount == 0)
 	{
-		char Client_SteamID64[32];
+		char Client_SteamID64[32], Insert_Query[1024];
 	
 		ResetPack(pData);
 	
@@ -129,17 +143,33 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
 		
 		//Create User
+		Format(Insert_Query, sizeof Insert_Query, "INSERT INTO Dodgeball_LS (`steamid`) VALUES ('%s')", Client_SteamID64);
+		
+		db.Query(SQL_OnCreatePlayerData, Insert_Query, client);
 		
 		return;
+	}
+	
+	results.FetchRow();
+}
+
+public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any pData)
+{
+	if (results == null)
+	{
+		EL_LogPlugin(LOG_ERROR, "Unable to create player data: %s", error);
+		
+		if (Verbose)
+			PrintToConsole(pData, "Unable to create player data: %s", error);
 	}
 }
 
 int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 {
-	return Logarithm(xp / BaseXP, multiplier);
+	return RoundToNearest(Logarithm(xp / BaseXP, multiplier));
 }
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 {
-	return (BaseXP * pow(multiplier, (level - 1)));
+	return RoundToNearest(BaseXP * pow(multiplier, (level - 1)));
 }
