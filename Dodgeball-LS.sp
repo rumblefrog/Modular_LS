@@ -50,6 +50,9 @@ char LSPL_Titles[5][] = {
 //<!-- Main -->
 Database hDB;
 
+int XP[MAXPLAYERS + 1] =  { -1, ... };
+int Prestige[MAXPLAYERS + 1] =  { -1, ... };
+
 public Plugin myinfo = 
 {
 	name = "Dodgeball LS",
@@ -66,11 +69,11 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	if (hDB == INVALID_HANDLE)
 		return APLRes_Failure;
 	
-	char TableCreateSQL[] = "CREATE TABLE `Dodgeball_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(64) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `timeplayed` BIGINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
+	char TableCreateSQL[] = "CREATE TABLE `Dodgeball_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(32) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `timeplayed` BIGINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
 	
 	SQL_SetCharset(hDB, "utf8mb4");
 			
-	hDB.Query(OnTableCreate, TableCreateSQL);
+	hDB.Query(OnTableCreate, TableCreateSQL, _, DBPrio_High);
 	
 	RegPluginLibrary("Dodgeball_LS");
 
@@ -93,7 +96,50 @@ public void OnPluginStart()
 	
 }
 
-int GetLevelFromXP(int xp, LSPL multiplier)
+public void OnClientPostAdminCheck(int client)
+{
+	char Select_Query[1024], Client_SteamID64[32];
+	
+	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	
+	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Dodgeball_LS WHERE `steamid` = '%s'", Client_SteamID64);
+	
+	DataPack pData = CreateDataPack();
+	WritePackCell(pData, client);
+	WritePackString(pData, Client_SteamID64);
+	
+	hDB.Query(SQL_OnFetchPlayerData, pData);
+}
+
+public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
+{
+	if (results == null)
+	{
+		EL_LogPlugin(LOG_ERROR, "Unable to fetch player data: %s", error);
+		return;
+	}
+	
+	if (results.RowCount == 0)
+	{
+		char Client_SteamID64[32];
+	
+		ResetPack(pData);
+	
+		int client = ReadPackCell(pData);
+		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
+		
+		//Create User
+		
+		return;
+	}
+}
+
+int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 {
 	return Logarithm(xp / BaseXP, multiplier);
+}
+
+int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
+{
+	return (BaseXP * pow(multiplier, (level - 1)));
 }
