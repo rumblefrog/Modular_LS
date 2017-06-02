@@ -142,10 +142,27 @@ public Action CmdPrestige(int client, int args)
 			
 		return Plugin_Handled;
 	}
+
+	char Update_Query[1024], Client_SteamID64[32];
 	
+	GetClientAuthID(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	
+	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = 0, `prestige`= `prestige` + 1 WHERE `steamid` = '%s'", Client_SteamID64);
 	//TODO: To be completed
 	
+	Datapack pData = CreateDataPack();
+	
+	WritePackCell(pData, GetCmdReplySource());
+	WritePackCell(pData, client);
+	
 	return Plugin_Handled;
+}
+
+public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
+{
+	//Read Pack
+	//Play Sound
+	//Error back if any
 }
 
 public void OnClientPostAdminCheck(int client)
