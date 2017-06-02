@@ -28,18 +28,16 @@ enum LSPL
 	LSPL_1,
 	LSPL_2,
 	LSPL_3,
-	LSPL_4,
-	LSPL_Total
+	LSPL_4
 }
 
 enum LSPL_Multiplier
 {
-	LSPL_Multiplier_0 = 1.13,
-	LSPL_Multiplier_1 = 1.137,
-	LSPL_Multiplier_2 = 1.144,
-	LSPL_Multiplier_3 = 1.151,
-	LSPL_Multiplier_4 = 1.158,
-	LSPL_Multiplier_Total,
+	float:LSPL_Multiplier_0 = 1.13,
+	float:LSPL_Multiplier_1 = 1.137,
+	float:LSPL_Multiplier_2 = 1.144,
+	float:LSPL_Multiplier_3 = 1.151,
+	float:LSPL_Multiplier_4 = 1.158,
 	LSPL_Multiplier_Invalid
 }
 
@@ -120,6 +118,35 @@ public Action CmdToggleDebug(int client, int args)
 }
 
 public Action CmdPrestige(int client, int args)
+{
+	if (XP[client] == -1 || Prestige[client] == -1)
+	{
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Oops, unable to prestige. Please contact an admin.");
+		
+		return Plugin_Handled;
+	}
+		
+	
+	if (Prestige[client] >= 5)
+	{
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
+			
+		return Plugin_Handled;
+	}
+	
+	int UserLevel = GetUserLevel(client);
+	
+	if (UserLevel != 50 || UserLevel == -1)
+	{
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You can only prestige at level 50!");
+			
+		return Plugin_Handled;
+	}
+	
+	//TODO: To be completed
+	
+	return Plugin_Handled;
+}
 
 public void OnClientPostAdminCheck(int client)
 {
@@ -154,7 +181,6 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	
 		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
 		
-		//Create User
 		Format(Insert_Query, sizeof Insert_Query, "INSERT INTO Dodgeball_LS (`steamid`) VALUES ('%s')", Client_SteamID64);
 		
 		db.Query(SQL_OnCreatePlayerData, Insert_Query, client);
@@ -256,8 +282,18 @@ bool CanGainXP(int client)
 {
 	if (XP[client] == -1 || Prestige[client] == -1)
 		return false;
+		
+	int UserLevel = GetUserLevel(client);
 	
-	if (GetUserLevel(client) >= 50)
+	if (UserLevel == -1)
+	{
+		if (Verbose)
+			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Invalid prestige data.");
+			
+		return false;
+	}
+	
+	if (UserLevel >= 50)
 	{
 		if (Verbose)
 			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
@@ -278,9 +314,9 @@ bool CanGainXP(int client)
 
 int GetUserLevel(int client)
 {
-	LSPL_Multiplier multiplier;
+	LSPL_Multiplier multiplier = GetMultiplierByPrestige(client);
 	
-	if ((multiplier = GetMultiplierByPrestige(client)) == LSPL_Multiplier_Invalid)
+	if (multiplier == LSPL_Multiplier_Invalid)
 		return -1;
 		
 	return RoundToNearest(Logarithm(((XP[client] / BaseXP) * 1.0), view_as<float>(multiplier)));
@@ -293,7 +329,7 @@ int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 {
-	return RoundToNearest(BaseXP * pow(multiplier, (level - 1)));
+	return RoundToNearest(BaseXP * pow(view_as<float>(multiplier), (level - 1)));
 }
 
 bool IsValidClient(int iClient, bool bAlive = false)
