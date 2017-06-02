@@ -79,7 +79,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	
 	RegPluginLibrary("Dodgeball_LS");
 
-	//CreateNative("DBLS_GetUserLevel", NativeAddBroadcast);
+	//CreateNative("DBLS_GetUserLevel", NativeGetUserLevel);
 	
 	return APLRes_Success;
 }
@@ -151,6 +151,9 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	}
 	
 	results.FetchRow();
+	
+	XP[client] = results.FetchInt(2);
+	Prestige[client] = results.FetchInt(3);
 }
 
 public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any pData)
