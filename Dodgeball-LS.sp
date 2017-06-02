@@ -38,7 +38,9 @@ enum LSPL_Multiplier
 	LSPL_Multiplier_1 = 1.137,
 	LSPL_Multiplier_2 = 1.144,
 	LSPL_Multiplier_3 = 1.151,
-	LSPL_Multiplier_4 = 1.158
+	LSPL_Multiplier_4 = 1.158,
+	LSPL_Multiplier_Total,
+	LSPL_Multiplier_Invalid
 }
 
 char LSPL_Titles[5][] = {
@@ -99,6 +101,7 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 
 public void OnPluginStart()
 {
+	RegConsoleCmd("sm_prestige", CmdPrestige, "Prestige!");
 	RegAdminCmd("sm_dls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle console debugging");
 	
 	HookEvent("player_death", Event_PlayerDeath);
@@ -115,6 +118,8 @@ public Action CmdToggleDebug(int client, int args)
 	
 	return Plugin_Handled;
 }
+
+public Action CmdPrestige(int client, int args)
 
 public void OnClientPostAdminCheck(int client)
 {
@@ -182,8 +187,8 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 	if (iVictim == iAttacker)
 		return;
 		
-	int XP = GetSessionBonus(iAttacker, KillXP);
-	AddXPToUser(iAttacker, XP);
+	int XPGain = GetSessionBonus(iAttacker, KillXP);
+	AddXPToUser(iAttacker, XPGain);
 }
 
 int GetSessionBonus(int client, int base_xp)
@@ -200,6 +205,9 @@ int GetSessionBonus(int client, int base_xp)
 
 void AddXPToUser(int client, int xp)
 {
+	if (!CanGainXP(client))
+		return;
+	
 	char Update_Query[1024], Client_SteamID64[32];
 	
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
@@ -220,6 +228,64 @@ public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] err
 	}
 }
 
+LSPL_Multiplier GetMultiplierByPrestige(int client)
+{
+	if (!IsValidClient(client))
+		return LSPL_Multiplier_Invalid;
+	
+	switch (Prestige[client])
+	{
+		case 0:
+			return LSPL_Multiplier_0;
+		case 1:
+			return LSPL_Multiplier_1;
+		case 2:
+			return LSPL_Multiplier_2;
+		case 3:
+			return LSPL_Multiplier_3;
+		case 4:
+			return LSPL_Multiplier_4;
+		default:
+			return LSPL_Multiplier_Invalid;
+	}
+	
+	return LSPL_Multiplier_Invalid;
+}
+
+bool CanGainXP(int client)
+{
+	if (XP[client] == -1 || Prestige[client] == -1)
+		return false;
+	
+	if (GetUserLevel(client) >= 50)
+	{
+		if (Verbose)
+			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+			
+		return false;
+	}
+	
+	if (Prestige[client] >= 5)
+	{
+		if (Verbose)
+			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
+			
+		return false;
+	}
+		
+	return true;
+}
+
+int GetUserLevel(int client)
+{
+	LSPL_Multiplier multiplier;
+	
+	if ((multiplier = GetMultiplierByPrestige(client)) == LSPL_Multiplier_Invalid)
+		return -1;
+		
+	return RoundToNearest(Logarithm(((XP[client] / BaseXP) * 1.0), view_as<float>(multiplier)));
+}
+
 int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 {
 	return RoundToNearest(Logarithm(xp / BaseXP, multiplier));
@@ -228,4 +294,14 @@ int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 {
 	return RoundToNearest(BaseXP * pow(multiplier, (level - 1)));
+}
+
+bool IsValidClient(int iClient, bool bAlive = false)
+{
+	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && XP[iClient] != -1 && Prestige[iClient] != -1 && (bAlive == false || IsPlayerAlive(iClient)))
+	{
+		return true;
+	}
+
+	return false;
 }
