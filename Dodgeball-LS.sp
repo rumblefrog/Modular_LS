@@ -15,8 +15,12 @@
 
 #define BaseXP 10
 
+#define MaxBonusHour 2
+
 #define MaxPL 5
 #define MaxPLL 50
+
+#define KillXP 2
 
 enum LSPL
 {
@@ -96,6 +100,8 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 public void OnPluginStart()
 {
 	RegAdminCmd("sm_dls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle console debugging");
+	
+	HookEvent("player_death", Event_PlayerDeath);
 }
 
 public Action CmdToggleDebug(int client, int args)
@@ -133,13 +139,14 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 		return;
 	}
 	
+	ResetPack(pData);
+	
+	int client = ReadPackCell(pData);
+	
 	if (results.RowCount == 0)
 	{
 		char Client_SteamID64[32], Insert_Query[1024];
 	
-		ResetPack(pData);
-	
-		int client = ReadPackCell(pData);
 		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
 		
 		//Create User
@@ -164,6 +171,52 @@ public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[
 		
 		if (Verbose)
 			PrintToConsole(pData, "Unable to create player data: %s", error);
+	}
+}
+
+public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+	int iVictim = event.GetInt("userid");
+	int iAttacker = event.GetInt("attacker");
+	
+	if (iVictim == iAttacker)
+		return;
+		
+	int XP = GetSessionBonus(iAttacker, KillXP);
+	AddXPToUser(iAttacker, XP);
+}
+
+int GetSessionBonus(int client, int base_xp)
+{
+	float SessionTime = GetClientTime(client);
+	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + 1.0);
+	int MaxBonusSession = (60 * 60 * MaxBonusHour);
+	
+	if (SessionTime >= MaxBonusSession)
+		return RoundToNearest(base_xp * MaxBonusMultiplier);
+	else
+		return RoundToNearest(base_xp * ((SessionTime / MaxBonusSession) + 1.0));
+}
+
+void AddXPToUser(int client, int xp)
+{
+	char Update_Query[1024], Client_SteamID64[32];
+	
+	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	
+	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = '%u' WHERE `steamid` = '%s'", xp, Client_SteamID64);
+	
+	hDB.Query(SQL_OnAddXPToUser, Update_Query, client);
+}
+
+public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] error, any pData)
+{
+	if (results == null)
+	{
+		EL_LogPlugin(LOG_ERROR, "Unable to add XP to player: %s", error);
+		
+		if (Verbose)
+			PrintToConsole(pData, "Unable to add XP to player: %s", error);
 	}
 }
 
