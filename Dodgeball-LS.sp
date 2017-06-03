@@ -103,6 +103,8 @@ public void OnPluginStart()
 	RegAdminCmd("sm_dls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle console debugging");
 	
 	HookEvent("player_death", Event_PlayerDeath);
+	
+	//Cache sounds
 }
 
 public Action CmdToggleDebug(int client, int args)
@@ -145,24 +147,39 @@ public Action CmdPrestige(int client, int args)
 
 	char Update_Query[1024], Client_SteamID64[32];
 	
-	GetClientAuthID(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = 0, `prestige`= `prestige` + 1 WHERE `steamid` = '%s'", Client_SteamID64);
 	//TODO: To be completed
 	
-	Datapack pData = CreateDataPack();
+	DataPack pData = CreateDataPack();
 	
 	WritePackCell(pData, GetCmdReplySource());
 	WritePackCell(pData, client);
 	
+	hDB.Query(SQL_OnPlayerPrestige, Update_Query, pData);
+	
 	return Plugin_Handled;
 }
 
-public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
+public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] error, any pData)
 {
-	//Read Pack
+	ResetPack(pData);
+	
+	ReplySource CmdOrigin = ReadPackCell(pData);
+	int client = ReadPackCell(pData);
+	
+	SetCmdReplySource(CmdOrigin);
+	
+	if (results == null)
+	{
+		//ReplyToCommand(client, "");
+		return;
+	}
+	
 	//Play Sound
-	//Error back if any
+	XP[client] = 0;
+	Prestige[client]++;
 }
 
 public void OnClientPostAdminCheck(int client)
