@@ -58,6 +58,12 @@ bool Verbose;
 
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
+int Level[MAXPLAYERS + 1] =  { -1, ... };
+
+int XPAtLevel[MAXPLAYERS + 1] =  { -1, ... };
+int XPToNextLevel[MAXPLAYERS + 1] =  { -1, ... };
+
+Handle Progression_Hud;
 
 public Plugin myinfo = 
 {
@@ -104,7 +110,26 @@ public void OnPluginStart()
 	
 	HookEvent("player_death", Event_PlayerDeath);
 	
+	Progression_Hud = CreateHudSynchronizer();
+	
 	//Cache sounds
+}
+
+public void OnMapStart()
+{
+	CreateTimer(0.5, Timer_Progression_Hud, _, TIMER_REPEAT);
+}
+
+public Action Timer_Progression_Hud(Handle hTimer)
+{
+	SetHudTextParams(0.15, 0.15, 1.1, 0, 206, 209, 255);
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (IsValidClient(iClient) && !IsFakeClient(iClient))
+		{
+			ShowSyncHudText(iClient, Progression_Hud, "%i: %i/%i", Level[iClient] + 1, XPAtLevel[iClient], XPToNextLevel[iClient]);
+		}
+	}
 }
 
 public Action CmdToggleDebug(int client, int args)
@@ -123,7 +148,7 @@ public Action CmdPrestige(int client, int args)
 {
 	if (XP[client] == -1 || Prestige[client] == -1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Oops, unable to prestige. Please contact an admin.");
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Oops, unable to prestige.");
 		
 		return Plugin_Handled;
 	}
@@ -150,7 +175,6 @@ public Action CmdPrestige(int client, int args)
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = 0, `prestige`= `prestige` + 1 WHERE `steamid` = '%s'", Client_SteamID64);
-	//TODO: To be completed
 	
 	DataPack pData = CreateDataPack();
 	
@@ -173,11 +197,12 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 	
 	if (results == null)
 	{
-		//ReplyToCommand(client, "");
+		ReplyToCommand(client, "Fail to prestige, please try again later");
 		return;
 	}
 	
-	//Play Sound
+	//TODO:Play Sound
+	
 	XP[client] = 0;
 	Prestige[client]++;
 }
@@ -247,11 +272,11 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 	if (iVictim == iAttacker)
 		return;
 		
-	int XPGain = GetSessionBonus(iAttacker, KillXP);
+	int XPGain = GetXPValue(iAttacker, KillXP);
 	AddXPToUser(iAttacker, XPGain);
 }
 
-int GetSessionBonus(int client, int base_xp)
+int GetXPValue(int client, int base_xp)
 {
 	float SessionTime = GetClientTime(client);
 	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + 1.0);
@@ -272,13 +297,21 @@ void AddXPToUser(int client, int xp)
 	
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
-	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = '%u' WHERE `steamid` = '%s'", xp, Client_SteamID64);
+	Format(Update_Query, sizeof Update_Query, "UPDATE Dodgeball_LS SET `xp` = `xp` + '%u' WHERE `steamid` = '%s'", xp, Client_SteamID64);
 	
-	hDB.Query(SQL_OnAddXPToUser, Update_Query, client);
+	DataPack pData = CreateDataPack();
+	WritePackCell(pData, client);
+	WritePackCell(pData, xp);
+	
+	hDB.Query(SQL_OnAddXPToUser, Update_Query, pData);
 }
 
 public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] error, any pData)
 {
+	ResetPack(pData);
+	int client = ReadPackCell(pData);
+	int xp = ReadPackCell(pData);
+	
 	if (results == null)
 	{
 		EL_LogPlugin(LOG_ERROR, "Unable to add XP to player: %s", error);
@@ -286,6 +319,9 @@ public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] err
 		if (Verbose)
 			PrintToConsole(pData, "Unable to add XP to player: %s", error);
 	}
+	
+	XP[client] += xp;
+	CalculateValues(client);
 }
 
 LSPL_Multiplier GetMultiplierByPrestige(int client)
@@ -346,6 +382,23 @@ bool CanGainXP(int client)
 	return true;
 }
 
+void CalculateValues(int client)
+{
+	Level[client] = GetUserLevel(client);
+	
+	if (Level[client] == -1 || Level[client] >= 50)
+		return;
+	
+	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(client);
+	
+	int CurrentLevelXPBuffer = GetXPFromLevel(Level[client], Multiplier);
+	int NextLevel = Level[client] + 1;
+	int NextLevelBuffer = GetXPFromLevel(NextLevel, Multiplier);
+	
+	XPToNextLevel[client] = NextLevelBuffer - CurrentLevelXPBuffer;
+	XPAtLevel[client] = XP[client] - CurrentLevelXPBuffer;
+}
+
 int GetUserLevel(int client)
 {
 	LSPL_Multiplier multiplier = GetMultiplierByPrestige(client);
@@ -353,17 +406,17 @@ int GetUserLevel(int client)
 	if (multiplier == LSPL_Multiplier_Invalid)
 		return -1;
 		
-	return RoundToNearest(Logarithm(((XP[client] / BaseXP) * 1.0), view_as<float>(multiplier)));
+	return RoundToFloor(Logarithm(((XP[client] / BaseXP) * 1.0), view_as<float>(multiplier)));
 }
 
 int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 {
-	return RoundToNearest(Logarithm(xp / BaseXP, multiplier));
+	return RoundToNearest(Logarithm(xp / BaseXP, view_as<float>(multiplier)));
 }
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 {
-	return RoundToNearest(BaseXP * pow(view_as<float>(multiplier), (level - 1)));
+	return RoundToNearest(BaseXP * Pow(view_as<float>(multiplier), (level - 1) * 1.0));
 }
 
 bool IsValidClient(int iClient, bool bAlive = false)
