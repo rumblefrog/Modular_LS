@@ -49,6 +49,17 @@ native int MLS_GetPrestigeColorHex(int client);
 native int MLS_GetPrestigeTitle(char[] buffer, int size, int client);
 
 
+/**
+* Add XP to client
+* 
+* @param client			Client Index
+* @param xp				XP Value
+* @param bonus			Whether to consider other factors (playtime, membership, etc)
+* @noreturn
+*/
+native int MLS_AddXP(int client, int xp, bool bonus = true);
+
+
 public SharedPlugin __pl_Modular_LS =
 {
 	name = "Modular_LS",
@@ -69,5 +80,6 @@ public __pl_Modular_LS_SetNTVOptional()
 	MarkNativeAsOptional("MLS_GetPrestigeColorRGB");
 	MarkNativeAsOptional("MLS_GetPrestigeColorHex");
 	MarkNativeAsOptional("MLS_GetPrestigeTitle");
+	MarkNativeAsOptional("MLS_AddXP");
 }
 #endif

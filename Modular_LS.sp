@@ -103,6 +103,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("MLS_GetPrestigeColorRGB", Native_GetPrestigeColorRGB);
 	CreateNative("MLS_GetPrestigeColorHex", Native_GetPrestigeColorHex);
 	CreateNative("MLS_GetPrestigeTitle", Native_GetPrestigeTitle);
+	CreateNative("MLS_AddXP", Native_AddXP);
 	
 	return APLRes_Success;
 }
@@ -119,10 +120,10 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 public void OnPluginStart()
 {
 	RegConsoleCmd("sm_prestige", CmdPrestige, "Prestige!");
+	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
 	RegAdminCmd("sm_mls_addxp", CmdAddXP, ADMFLAG_ROOT, "DEBUG: Add XP");
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
-	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	
 	Progression_Hud = CreateHudSynchronizer();
 }
@@ -148,7 +149,7 @@ public Action Timer_Progression_Hud(Handle hTimer)
 		if (IsValidClient(iClient) && !IsFakeClient(iClient))
 		{
 			GetColorRGB(colors, iClient);
-			SetHudTextParams(0.05, 0.10, 1.1, 0, colors[0], colors[1], colors[2]);
+			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[0], colors[1], colors[2], 0);
 					
 			if (Prestige[iClient] != 5)
 			{
@@ -719,4 +720,32 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 	SetNativeString(1, LSPL_Titles[Prestige[client]], buffer_size);
 	
 	return 0;
+}
+
+public int Native_AddXP(Handle plugin, int numParams)
+{
+	if (numParams < 3)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
+		
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		
+	if (!CanGainXP(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid prestige data for client %d", client);
+		
+	int buffer = GetNativeCell(2);
+		
+	if (buffer < 0)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Cannot add negative XP");
+		
+	bool bonus = GetNativeCell(3);
+		
+	if (bonus)
+		buffer = GetXPValue(client, buffer);
+	
+	AddXPToUser(client, buffer);
+	
+	return 1;
 }
