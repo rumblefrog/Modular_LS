@@ -3,7 +3,7 @@
 #define DEBUG
 
 #define PLUGIN_AUTHOR "Fishy"
-#define PLUGIN_VERSION "0.0.1"
+#define PLUGIN_VERSION "0.0.2"
 
 #include <sourcemod>
 #include <sdktools>
@@ -146,7 +146,7 @@ public Action Timer_Progression_Hud(Handle hTimer)
 	
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
-		if (IsValidClient(iClient) && !IsFakeClient(iClient))
+		if (IsValidClient(iClient))
 		{
 			GetColorRGB(colors, iClient);
 			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[0], colors[1], colors[2], 0);
@@ -575,7 +575,7 @@ int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 
 bool IsValidClient(int iClient, bool bAlive = false)
 {
-	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && XP[iClient] != -1 && Prestige[iClient] != -1 && (bAlive == false || IsPlayerAlive(iClient)))
+	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient) && XP[iClient] != -1 && Prestige[iClient] != -1 && (bAlive == false || IsPlayerAlive(iClient)))
 	{
 		return true;
 	}
@@ -651,7 +651,7 @@ public int Native_GetUserLevel(Handle plugin, int numParams)
 	
 	int client = GetNativeCell(1);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 		
 	return Level[client];
@@ -664,7 +664,7 @@ public int Native_GetUserPrestige(Handle plugin, int numParams)
 	
 	int client = GetNativeCell(1);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 		
 	return Prestige[client];
@@ -677,7 +677,7 @@ public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
 		
 	int client = GetNativeCell(2);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 	
 	int colors[3];
@@ -696,7 +696,7 @@ public int Native_GetPrestigeColorHex(Handle plugin, int numParams)
 		
 	int client = GetNativeCell(1);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 	
 	return GetColorHex(client);
@@ -709,7 +709,7 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 		
 	int client = GetNativeCell(3);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 	
 	if (Prestige[client] == -1 || Prestige[client] > 5)
@@ -729,7 +729,7 @@ public int Native_AddXP(Handle plugin, int numParams)
 		
 	int client = GetNativeCell(1);
 	
-	if (!IsValidClient(client) || IsFakeClient(client))
+	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 		
 	if (!CanGainXP(client))

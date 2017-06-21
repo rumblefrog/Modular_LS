@@ -59,6 +59,24 @@ native int MLS_GetPrestigeTitle(char[] buffer, int size, int client);
 */
 native int MLS_AddXP(int client, int xp, bool bonus = true);
 
+/**
+* Checks if it is a valid client
+* 
+* @param client			Client Index
+* @param bAlive			Check if alive
+* @return				True if valid, false if not
+*/
+stock bool IsValidClient(int client, bool bAlive = false)
+{
+	if (client >= 1 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client) &&
+	(bAlive == false || IsPlayerAlive(client)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
 
 public SharedPlugin __pl_Modular_LS =
 {
