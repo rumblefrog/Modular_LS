@@ -99,7 +99,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	RegPluginLibrary("Modular_LS");
 
 	CreateNative("MLS_GetUserLevel", Native_GetUserLevel);
-	CreateNative("MLS_GetPrestigeColor", Native_GetPrestigeColor);
+	CreateNative("MLS_GetUserPrestige", Native_GetUserPrestige);
+	CreateNative("MLS_GetPrestigeColorRGB", Native_GetPrestigeColorRGB);
+	CreateNative("MLS_GetPrestigeColorHex", Native_GetPrestigeColorHex);
 	CreateNative("MLS_GetPrestigeTitle", Native_GetPrestigeTitle);
 	
 	return APLRes_Success;
@@ -117,8 +119,9 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 public void OnPluginStart()
 {
 	RegConsoleCmd("sm_prestige", CmdPrestige, "Prestige!");
-	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle console debugging");
+	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
 	RegAdminCmd("sm_mls_addxp", CmdAddXP, ADMFLAG_ROOT, "DEBUG: Add XP");
+	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
 	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	
 	Progression_Hud = CreateHudSynchronizer();
@@ -145,7 +148,7 @@ public Action Timer_Progression_Hud(Handle hTimer)
 		if (IsValidClient(iClient) && !IsFakeClient(iClient))
 		{
 			GetColorRGB(colors, iClient);
-			SetHudTextParams(0.05, 0.10, 0.1, 0, colors[0], colors[1], colors[2]);
+			SetHudTextParams(0.05, 0.10, 1.1, 0, colors[0], colors[1], colors[2]);
 					
 			if (Prestige[iClient] != 5)
 			{
@@ -201,6 +204,25 @@ public Action CmdAddXP(int client, int args)
 	AddXPToUser(client, EXP);
 	
 	CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Requested %i XP to be added", EXP);
+	
+	return Plugin_Handled;
+}
+public Action CmdSetPrestige(int client, int args)
+{
+	if (args < 1)
+	{
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Missing Prestige");
+		
+		return Plugin_Handled;
+	}
+	
+	char buffer[16];
+	
+	GetCmdArg(1, buffer, sizeof buffer);
+	
+	int prestigel = StringToInt(buffer);
+	
+	Prestige[client] = prestigel;
 	
 	return Plugin_Handled;
 }
@@ -598,6 +620,29 @@ void GetColorRGB(int color[3], int client)
 	}
 }
 
+int GetColorHex(int client)
+{
+	switch (Prestige[client])
+	{
+		case 0:
+			return 0xd3dae5;
+		case 1:
+			return 0x320a8d;
+		case 2:
+			return 0x0eedc7;
+		case 3:
+			return 0xd3dae5;
+		case 4:
+			return 0x9e1414;
+		case 5:
+			return 0xd32ce6;
+		default:
+			return 0xd3d3dd;
+	}
+	
+	return 0xd3d3dd;
+}
+
 public int Native_GetUserLevel(Handle plugin, int numParams)
 {
 	if (numParams < 1)
@@ -611,7 +656,20 @@ public int Native_GetUserLevel(Handle plugin, int numParams)
 	return Level[client];
 }
 
-public int Native_GetPrestigeColor(Handle plugin, int numParams)
+public int Native_GetUserPrestige(Handle plugin, int numParams)
+{
+	if (numParams < 1)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing client parameter");
+	
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		
+	return Prestige[client];
+}
+
+public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
 {
 	if (numParams < 2)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
@@ -628,6 +686,19 @@ public int Native_GetPrestigeColor(Handle plugin, int numParams)
 	SetNativeArray(1, colors, sizeof colors);
 	
 	return 0;
+}
+
+public int Native_GetPrestigeColorHex(Handle plugin, int numParams)
+{
+	if (numParams < 1)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
+		
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClient(client) || IsFakeClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+	
+	return GetColorHex(client);
 }
 
 public int Native_GetPrestigeTitle(Handle plugin, int numParams)
