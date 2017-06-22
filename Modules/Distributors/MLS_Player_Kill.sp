@@ -8,7 +8,7 @@
 
 #pragma newdecls required
 
-#define BaseXP 1
+#define BaseXP 3
 
 public Plugin myinfo = 
 {

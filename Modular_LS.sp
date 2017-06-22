@@ -21,7 +21,7 @@
 #define MaxPLL 50
 
 #define Bar_Fill "█"
-#define Bar_Empty "▒"
+#define Bar_Empty "░"
 
 
 #define Sound_LVL "ls/lvl.wav"
@@ -42,10 +42,10 @@ enum LSPL
 enum LSPL_Multiplier
 {
 	float:LSPL_Multiplier_0 = 1.13,
-	float:LSPL_Multiplier_1 = 1.137,
-	float:LSPL_Multiplier_2 = 1.144,
-	float:LSPL_Multiplier_3 = 1.151,
-	float:LSPL_Multiplier_4 = 1.158,
+	float:LSPL_Multiplier_1 = 1.15,
+	float:LSPL_Multiplier_2 = 1.17,
+	float:LSPL_Multiplier_3 = 1.19,
+	float:LSPL_Multiplier_4 = 1.21,
 	LSPL_Multiplier_Invalid
 }
 
@@ -112,7 +112,7 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 {
 	if (results == null)
 	{
-		EL_LogPlugin(LOG_FATAL, "Unable to create DBLS table: %s", error);
+		EL_LogPlugin(LOG_FATAL, "Unable to create MLS table: %s", error);
 		SetFailState("Unable to create table: %s", error);
 	}
 }
