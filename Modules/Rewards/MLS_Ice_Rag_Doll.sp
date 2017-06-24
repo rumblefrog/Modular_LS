@@ -106,7 +106,10 @@ public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 {
 	if (level == 15 && prestige == 0)
 	{
-		MLS_PrintToClient(client, "You have unlocked ice rag dolls!");
-		MLS_PrintToClient(client, "Now whenever you kill someone, they turn into ice statues!");
+		
+		if (CheckCommandAccess(client, "mls_ird_permission", ADMFLAG_RESERVATION))
+			return;
+		
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}ice rag dolls{grey}! Now whenever you kill someone, they turn into ice statues.");
 	}
 }

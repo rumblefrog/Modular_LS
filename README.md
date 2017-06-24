@@ -9,7 +9,7 @@ One of the simplest broadcasting plugin
 
 # Native
 
-- [Include File](https://github.com/RumbleFrog/Transparent-Broadcast/blob/master/include/Modular_LS.inc
+- [Include File](https://github.com/RumbleFrog/Transparent-Broadcast/blob/master/include/Modular_LS.inc)
 
 # Modules
 
