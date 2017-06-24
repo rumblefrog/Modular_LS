@@ -5,7 +5,6 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <sdkhooks>
 #include <Modular_LS>
 
 #pragma newdecls required
@@ -36,7 +35,7 @@ public void OnPluginStart()
 		SetFailState("Game Not Supported");
 }
 
-public void OnGameFrame()
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
 {
 	int iEntity = -1;
 	while((iEntity = FindEntityByClassname(iEntity, "tf_projectile_rocket")) != INVALID_ENT_REFERENCE)

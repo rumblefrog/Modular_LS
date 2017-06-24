@@ -27,7 +27,7 @@ native int MLS_GetUserPrestige(int client);
 * @param client			Client Index
 * @noreturn
 */
-native int MLS_GetPrestigeColorRGB(int colors[3], int client);
+native void MLS_GetPrestigeColorRGB(int colors[3], int client);
 
 /**
 * Get client prestige colors
@@ -46,7 +46,7 @@ native int MLS_GetPrestigeColorHex(int client);
 * @param client			Client Index
 * @noreturn
 */
-native int MLS_GetPrestigeTitle(char[] buffer, int size, int client);
+native void MLS_GetPrestigeTitle(char[] buffer, int size, int client);
 
 
 /**
@@ -57,7 +57,37 @@ native int MLS_GetPrestigeTitle(char[] buffer, int size, int client);
 * @param bonus			Whether to consider other factors (playtime, membership, etc)
 * @noreturn
 */
-native int MLS_AddXP(int client, int xp, bool bonus = true);
+native void MLS_AddXP(int client, int xp, bool bonus = true);
+
+/**
+* Called whenever a client levels up
+*
+* @param client			Client Index
+* @param level			Client Level
+* @param prestige		Client Prestige
+* @noreturn
+*/
+forward void MLS_OnClientLeveledUp(int client, int level, int prestige);
+
+/**
+* Called whenever a client prestige
+*
+* @param client			Client Index
+* @param level			Client Level (Should be always 0 on prestige)
+* @param prestige		Client Prestige
+* @noreturn
+*/
+forward void MLS_OnClientPrestige(int client, int level, int prestige);
+
+/**
+* Print to client chat using core format
+* 
+* @param client			Client Index
+* @param format			Format
+* @param ...			Any additional formating data
+* @noreturn
+*/
+native void MLS_PrintToClient(int client, const char[] format, any ...);
 
 /**
 * Checks if it is a valid client
@@ -99,5 +129,6 @@ public __pl_Modular_LS_SetNTVOptional()
 	MarkNativeAsOptional("MLS_GetPrestigeColorHex");
 	MarkNativeAsOptional("MLS_GetPrestigeTitle");
 	MarkNativeAsOptional("MLS_AddXP");
+	MarkNativeAsOptional("MLS_PrintToClient");
 }
 #endif

@@ -73,6 +73,11 @@ int XPAtLevel[MAXPLAYERS + 1] =  { -1, ... };
 int XPToNextLevel[MAXPLAYERS + 1] =  { -1, ... };
 
 Handle Progression_Hud;
+Handle LevelForward;
+Handle PrestigeForward;
+
+char ProgressBar[MAXPLAYERS + 1][64];
+int colors[MAXPLAYERS + 1][3];
 
 public Plugin myinfo = 
 {
@@ -104,6 +109,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("MLS_GetPrestigeColorHex", Native_GetPrestigeColorHex);
 	CreateNative("MLS_GetPrestigeTitle", Native_GetPrestigeTitle);
 	CreateNative("MLS_AddXP", Native_AddXP);
+	CreateNative("MLS_PrintToClient", Native_PrintToClient);
 	
 	return APLRes_Success;
 }
@@ -126,6 +132,9 @@ public void OnPluginStart()
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
 	
 	Progression_Hud = CreateHudSynchronizer();
+	
+	LevelForward = CreateGlobalForward("MLS_OnClientLeveledUp", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
+	PrestigeForward = CreateGlobalForward("MLS_OnClientPrestige", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 }
 
 public void OnMapStart()
@@ -141,15 +150,12 @@ public void OnMapStart()
 
 public Action Timer_Progression_Hud(Handle hTimer)
 {	
-	char ProgressBar[64];
-	int colors[3];
-	
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
 		if (IsValidClient(iClient))
 		{
-			GetColorRGB(colors, iClient);
-			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[0], colors[1], colors[2], 0);
+			GetColorRGB(colors[iClient], iClient);
+			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[iClient][0], colors[iClient][1], colors[iClient][2], 0);
 					
 			if (Prestige[iClient] != 5)
 			{
@@ -157,8 +163,8 @@ public Action Timer_Progression_Hud(Handle hTimer)
 					ShowSyncHudText(iClient, Progression_Hud, "N/A");
 				else
 				{
-					GenerateProgressBar(XPAtLevel[iClient], XPToNextLevel[iClient], ProgressBar, sizeof ProgressBar);
-					ShowSyncHudText(iClient, Progression_Hud, "%i: %s %i/%i", Level[iClient], ProgressBar, XPAtLevel[iClient], XPToNextLevel[iClient]);
+					GenerateProgressBar(XPAtLevel[iClient], XPToNextLevel[iClient], ProgressBar[iClient], sizeof ProgressBar[]);
+					ShowSyncHudText(iClient, Progression_Hud, "[Lvl] %i: %s %i/%i", Level[iClient], ProgressBar[iClient], XPAtLevel[iClient], XPToNextLevel[iClient]);
 				}
 			} else
 				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige");
@@ -208,6 +214,7 @@ public Action CmdAddXP(int client, int args)
 	
 	return Plugin_Handled;
 }
+
 public Action CmdSetPrestige(int client, int args)
 {
 	if (args < 1)
@@ -302,13 +309,21 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 		return;
 	}
 	
+	EmitSoundToClient(client, Sound_Prestige);
+	EmitSoundToClient(client, Sound_Prestige);
+	
 	CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have prestiged!");
-	
-	
-	EmitSoundToClient(client, Sound_Prestige, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
 	
 	XP[client] = 0;
 	Prestige[client]++;
+	
+	Call_StartForward(PrestigeForward);
+	
+	Call_PushCell(client);
+	Call_PushCell(0); //Always 0 on prestige "XP[client] = 0;"
+	Call_PushCell(Prestige[client]);
+	
+	Call_Finish();
 	
 	CalculateValues(client);
 }
@@ -528,7 +543,16 @@ void CalculateValues(int client)
 	
 	if (OriginLevel != -1 && Level[client] > OriginLevel)
 	{
-		EmitSoundToClient(client, Sound_LVL, SOUND_FROM_PLAYER, SNDCHAN_AUTO, SNDLEVEL_GUNFIRE);
+		Call_StartForward(LevelForward);
+		
+		Call_PushCell(client);
+		Call_PushCell(Level[client]);
+		Call_PushCell(Prestige[client]);
+		
+		Call_Finish();
+		
+		EmitSoundToClient(client, Sound_LVL);
+		EmitSoundToClient(client, Sound_LVL);
 		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have leveled up!");
 	}
 	
@@ -563,10 +587,10 @@ int GetUserLevel(int client)
 }
 
 // < -- Unused -- >
-//int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
-//{
-//	return RoundToFloor( 1 + Logarithm(xp / BaseXP, view_as<float>(multiplier)));
-//}
+stock int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
+{
+	return RoundToFloor( 1 + Logarithm(xp / BaseXP, view_as<float>(multiplier)));
+}
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 {
@@ -585,6 +609,8 @@ bool IsValidClient(int iClient, bool bAlive = false)
 
 void GenerateProgressBar(int value, int base, char[] buffer, int size)
 {
+	Format(buffer, size, "");
+	
 	int filled = RoundToFloor((float(value) / float(base)) * 10);
 	
 	int empty = 10 - filled;
@@ -630,9 +656,9 @@ int GetColorHex(int client)
 		case 1:
 			return 0x320a8d;
 		case 2:
-			return 0x0eedc7;
+			return 0xb8860b;
 		case 3:
-			return 0xd3dae5;
+			return 0x0eedc7;
 		case 4:
 			return 0x9e1414;
 		case 5:
@@ -680,11 +706,11 @@ public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
 	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
 	
-	int colors[3];
+	int color_buffer[3];
 	
-	GetColorRGB(colors, client);
+	GetColorRGB(color_buffer, client);
 	
-	SetNativeArray(1, colors, sizeof colors);
+	SetNativeArray(1, color_buffer, sizeof color_buffer);
 	
 	return 0;
 }
@@ -748,4 +774,23 @@ public int Native_AddXP(Handle plugin, int numParams)
 	AddXPToUser(client, buffer);
 	
 	return 1;
+}
+
+public int Native_PrintToClient(Handle plugin, int numParams)
+{
+	if (numParams < 2)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
+		
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		
+	char buffer[254];
+		
+	FormatNativeString(0, 2, 3, sizeof buffer, _, buffer);
+	
+	CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}%s", buffer);
+	
+	return 0;
 }
