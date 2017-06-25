@@ -41,11 +41,11 @@ enum LSPL
 
 enum LSPL_Multiplier
 {
-	float:LSPL_Multiplier_0 = 1.13,
-	float:LSPL_Multiplier_1 = 1.15,
-	float:LSPL_Multiplier_2 = 1.17,
-	float:LSPL_Multiplier_3 = 1.19,
-	float:LSPL_Multiplier_4 = 1.21,
+	float:LSPL_Multiplier_0 = 1.14,
+	float:LSPL_Multiplier_1 = 1.16,
+	float:LSPL_Multiplier_2 = 1.18,
+	float:LSPL_Multiplier_3 = 1.20,
+	float:LSPL_Multiplier_4 = 1.22,
 	LSPL_Multiplier_Invalid
 }
 
