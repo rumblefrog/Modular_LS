@@ -49,7 +49,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 	if (CheckCommandAccess(iAttacker, "mls_ird_permission", ADMFLAG_RESERVATION))
 		return;
 		
-	if (MLS_GetUserLevel(iAttacker) < 15)
+	if (!IsLucky(iAttacker))
 		return;
 	
 	int iVteam = GetClientTeam(iVictim);
@@ -102,14 +102,86 @@ public Action RemoveRagedoll(Handle timer, any iEnt)
 	}
 }
 
+bool IsLucky(int client)
+{
+	int Level = MLS_GetUserLevel(client);
+	
+	int Prestige = MLS_GetUserPrestige(client);
+	
+	if (Level < 15 && Prestige == 0)
+		return false;
+		
+	if (Prestige == 5)
+		return true;
+		
+	if (Prestige == 0 && Level >= 15)
+		return IsLuckyPercentage(15);
+		
+	if (Prestige == 1 && Level >= 25)
+		return IsLuckyPercentage(30);
+	if (Prestige == 1 && Level < 25)
+		return IsLuckyPercentage(15);
+		
+	if (Prestige == 2 && Level >= 25)
+		return IsLuckyPercentage(45);
+	if (Prestige == 2 && Level < 25)
+		return IsLuckyPercentage(30);
+		
+	if (Prestige == 3 && Level >= 45)
+		return IsLuckyPercentage(60);
+	if (Prestige == 3 && Level < 45)
+		return IsLuckyPercentage(45);
+		
+	if (Prestige == 4 && Level >= 45)
+		return IsLuckyPercentage(75);		
+	if (Prestige == 4 && Level < 45)
+		return IsLuckyPercentage(60);
+		
+	return false;
+}
+
 public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 {
-	if (level == 15 && prestige == 0)
-	{
-		
-		if (CheckCommandAccess(client, "mls_ird_permission", ADMFLAG_RESERVATION))
+	
+	if (CheckCommandAccess(client, "mls_ird_permission", ADMFLAG_RESERVATION))
 			return;
+			
+	if (DoubleEqual(level, prestige, 15, 0))
+	{
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [I]{grey}! Now whenever you kill someone, they have a 15% chance to turn into a ice statue.");
 		
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}ice rag dolls{grey}! Now whenever you kill someone, they turn into ice statues.");
+		return;
 	}
+	
+	if (DoubleEqual(level, prestige, 25, 1))
+	{
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [II]{grey}! Now whenever you kill someone, they have a 30% chance to turn into a ice statue.");
+		
+		return;
+	}
+	
+	if (DoubleEqual(level, prestige, 25, 2))
+	{
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [III]{grey}! Now whenever you kill someone, they have a 45% chance to turn into a ice statue.");
+		
+		return;
+	}
+	
+	if (DoubleEqual(level, prestige, 45, 3))
+	{
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [IV]{grey}! Now whenever you kill someone, they have a 60% chance to turn into a ice statue.");
+		
+		return;
+	}
+	
+	if (DoubleEqual(level, prestige, 45, 4))
+	{
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [V]{grey}! Now whenever you kill someone, they have a 75% chance to turn into a ice statue.");
+		
+		return;
+	}
+	
+	if (prestige == 5)
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ice Ragdolls [VI]{grey}! Now whenever you kill someone, they have a 100% chance to turn into a ice statue.");
+	
 }

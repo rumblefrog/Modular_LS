@@ -107,6 +107,42 @@ stock bool IsValidClient(int client, bool bAlive = false)
 	return false;
 }
 
+/**
+* Return random integer within range
+* 
+* @param iMin			Minimum Range
+* @param iMax			Max Range
+* @return				Random Integer within range
+*/
+stock int GetURandomIntRange(int iMin, int iMax)
+{
+	return iMin + (GetURandomInt() % (iMax - iMin + 1));
+}
+
+/**
+* Return true/false if lucky or not
+* 
+* @param Chance			A percentage to compare
+* @return				True if lucky, false otherwise
+*/
+stock bool IsLuckyPercentage(int Chance)
+{
+	return (GetURandomIntRange(0, 99) < Chance);
+}
+
+/**
+* Return true/false whether if both conditions match
+* 
+* @param var1			Variable 1
+* @param var2			Variable 2
+* @param val1			Expected value for variable 1
+* @param val2			Expected value for variable 2
+* @return				True if both pass, false otherwise
+*/
+stock bool DoubleEqual(int var1, int var2, int val1, int val2)
+{
+	return (var1 == val1 && var2 == val2);
+}
 
 public SharedPlugin __pl_Modular_LS =
 {
