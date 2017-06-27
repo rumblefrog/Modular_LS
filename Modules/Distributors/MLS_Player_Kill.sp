@@ -34,8 +34,8 @@ public void OnPluginStart()
 
 public void OnPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-	int iVictim = event.GetInt("userid");
-	int iAttacker = event.GetInt("attacker");
+	int iVictim = GetClientOfUserId(event.GetInt("userid"));
+	int iAttacker = GetClientOfUserId(event.GetInt("attacker"));
 	
 	if (iVictim == iAttacker)
 		return;
