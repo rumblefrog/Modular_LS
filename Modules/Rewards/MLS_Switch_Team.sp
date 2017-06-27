@@ -66,3 +66,9 @@ int GetOtherTeam(int client)
 	else
 		return Team_1;
 }
+
+public void MLS_OnClientLeveledUp(int client, int level, int prestige)
+{
+	if (DoubleEqual(level, prestige, 15, 4))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Ability To Switch Team{grey}! Now you can switch team using {chartreuse}!switchteam{grey}.");
+}

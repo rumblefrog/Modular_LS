@@ -91,12 +91,11 @@ public void OnClientDisconnect(int client)
 
 public Action CommandKillstreak(int client, int args)
 {
-	int prestige = MLS_GetUserPrestige(client);
-	int level = MLS_GetUserLevel(client);
-	
-	//True if below P0L50, false if above (expects true) [First Conditional]
-	if ((prestige == 0 && level < 50) && !CheckCommandAccess(client, "mls_ks_permission", ADMFLAG_RESERVATION))
+	if (!IsAERank(client, 0, 50) && !CheckCommandAccess(client, "mls_ks_permission", ADMFLAG_RESERVATION))
+	{
+		MLS_PrintToClient(client, "This ability unlocks at prestige 0 level 50");
 		return Plugin_Handled;
+	}
 	
 	if(IsClientInGame(client) && IsPlayerAlive(client))
 	{
