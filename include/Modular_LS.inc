@@ -90,6 +90,32 @@ forward void MLS_OnClientPrestige(int client, int level, int prestige);
 native void MLS_PrintToClient(int client, const char[] format, any ...);
 
 /**
+* Checks if client is above or equal rank
+* 
+* @param client			Client Index
+* @param prestige		Prestige
+* @param level			Level
+* @return				True if passed, false otherwise
+*/
+stock bool IsAERank(int client, int prestige, int level)
+{
+	if (!IsValidClient(client))
+		return false;
+	
+	int EPrestige = MLS_GetUserPrestige(client);
+	
+	if (EPrestige < prestige)
+		return false;
+		
+	int ELevel = MLS_GetUserLevel(client);
+		
+	if (EPrestige == prestige && ELevel < level)
+		return false;
+		
+	return true;
+}
+
+/**
 * Checks if it is a valid client
 * 
 * @param client			Client Index

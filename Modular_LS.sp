@@ -678,7 +678,7 @@ public int Native_GetUserLevel(Handle plugin, int numParams)
 	int client = GetNativeCell(1);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 		
 	return Level[client];
 }
@@ -691,7 +691,7 @@ public int Native_GetUserPrestige(Handle plugin, int numParams)
 	int client = GetNativeCell(1);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 		
 	return Prestige[client];
 }
@@ -704,7 +704,7 @@ public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
 	int client = GetNativeCell(2);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 	
 	int color_buffer[3];
 	
@@ -723,7 +723,7 @@ public int Native_GetPrestigeColorHex(Handle plugin, int numParams)
 	int client = GetNativeCell(1);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 	
 	return GetColorHex(client);
 }
@@ -736,7 +736,7 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 	int client = GetNativeCell(3);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 	
 	if (Prestige[client] == -1 || Prestige[client] > 5)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid prestige data for client %d", client);
@@ -756,7 +756,7 @@ public int Native_AddXP(Handle plugin, int numParams)
 	int client = GetNativeCell(1);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 		
 	if (!CanGainXP(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid prestige data for client %d", client);
@@ -784,7 +784,7 @@ public int Native_PrintToClient(Handle plugin, int numParams)
 	int client = GetNativeCell(1);
 	
 	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not connected", client);
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 		
 	char buffer[254];
 		
