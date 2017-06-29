@@ -60,6 +60,20 @@ native void MLS_GetPrestigeTitle(char[] buffer, int size, int client);
 native void MLS_AddXP(int client, int xp, bool bonus = true);
 
 /**
+* Add XP to all clients
+* 
+* @param xp				XP Value
+* @param bonus			Whether to consider other factors (playtime, membership, etc)
+* @noreturn
+*/
+stock void MLS_AddXPToAll(int xp, bool bonus = true)
+{
+	for (int i = 1; i <= MaxClients; i++)
+		if (IsValidClient(i))
+			MLS_AddXP(i, xp, bonus);
+}
+
+/**
 * Called whenever a client levels up
 *
 * @param client			Client Index
