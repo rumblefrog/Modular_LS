@@ -22,6 +22,8 @@ char ManaBar[MAXPLAYERS + 1][64];
 int Mana[MAXPLAYERS + 1] = { -1, ... };
 int ManaPool[MAXPLAYERS + 1] = { -1, ... };
 
+bool InfiniteMana[MAXPLAYERS + 1];
+
 Handle ManaHud;
 
 enum Spell
@@ -35,8 +37,10 @@ enum Spell
 	Spell_EMP = 1000, //P4L30
 }
 
+#include "Spells/Precache.inc"
 #include "Spells/Basic.inc"
 #include "Spells/Barricade.inc"
+#include "Spells/Shield.inc"
 
 public Plugin myinfo = 
 {
@@ -51,6 +55,8 @@ public void OnPluginStart()
 {
 	RegConsoleCmd("sm_spellbook", CmdSpellBook, "Opens Spellbook Menu");
 	
+	RegConsoleCmd("sm_infinitemana", CmdInfiniteMana, "[Debug] Infinite Mana"); //TODO: SET TO ROOT ONLY
+	
 	ManaHud = CreateHudSynchronizer();
 	
 	HookEvent("player_spawn", PlayerSpawn, EventHookMode_Post);
@@ -64,7 +70,25 @@ public void OnPluginStart()
 
 public Action CmdSpellBook(int client, int args)
 {
+	if (!IsValidClient(client))
+		return Plugin_Handled;
+		
 	DisplaySpellBook(client);
+	
+	return Plugin_Handled;
+}
+
+public Action CmdInfiniteMana(int client, int args)
+{
+	if (!IsValidClient(client))
+		return Plugin_Handled;
+		
+	if (!InfiniteMana[client])
+		MLS_PrintToClient(client, "{lightseagreen}[MaxDB] {grey}Enabled Infinite Mana");
+	else
+		MLS_PrintToClient(client, "{lightseagreen}[MaxDB] {grey}Disabled Infinite Mana");
+		
+	InfiniteMana[client] = !InfiniteMana[client];
 	
 	return Plugin_Handled;
 }
@@ -143,19 +167,25 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 		menu.GetItem(item, buffer, sizeof buffer);
 		spell = view_as<Spell>(StringToInt(buffer));
 		
-		switch (spell)
+		if (IsValidClient(client, true))
 		{
+			switch (spell)
+			{
 			case Spell_Fireball:
 				CastBasicSpell(client, Spell_Fireball);
 			case Spell_Meteorite:
 				CastBasicSpell(client, Spell_Meteorite);
 			case Spell_LightningOrb:
 				CastBasicSpell(client, Spell_LightningOrb);
+			case Spell_Shield:
+				CastShield(client);
 			case Spell_Barricade:
 				SpawnBarricade(client);
 			default:
 				MLS_PrintToClient(client, "Not yet implemented!"); //TODO: REMOVE
-		}
+			}
+		} else
+			MLS_PrintToClient(client, "Cannot cast spell while you are dead.");
 		
 		DisplaySpellBook(client);
 	}
@@ -252,6 +282,9 @@ bool DrainSpellMana(int client, Spell spell)
 	if (!IsValidMagic(client))
 		return false;
 		
+	if (InfiniteMana[client])
+		return true;
+		
 	int amount = view_as<int>(spell);
 		
 	if (Mana[client] < amount)
@@ -289,14 +322,24 @@ public void PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 }
 
 public void PlayerDeath(Event event, const char[] name, bool dontBroadcast)
-{
-	char buffer[64];
-	
+{	
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	
-	GetEntityClassname(client, buffer, sizeof buffer);
-	
-	PrintToChatAll("%s has been killed", buffer);
+	if (IsValidMagic(client))
+		RemoveShield(client);
+}
+
+public void OnPluginEnd()
+{
+	for (int i = 1; i <= MaxClients; i++)
+		if (IsValidMagic(i))
+			RemoveShield(i);
+}
+
+public void OnClientDisconnect(int client)
+{
+	if (IsValidMagic(client))
+		RemoveShield(client);
 }
 
 void GenerateProgressBar(int value, int base, char[] buffer, int size)

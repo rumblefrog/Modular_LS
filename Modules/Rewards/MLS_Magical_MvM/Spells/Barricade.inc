@@ -1,10 +1,3 @@
-#define BarricadeModel "models/props_coalmines/wood_fence_128.mdl"
-
-public void OnMapStart()
-{
-	PrecacheModel(BarricadeModel, true);
-}
-
 int SpawnBarricade(int iClient)
 {
 	if (!CanUseSpell(iClient, Spell_Barricade))
@@ -16,7 +9,7 @@ int SpawnBarricade(int iClient)
 	float fAngles[3], fCAngles[3], fCOrigin[3], fOrigin[3];
 
 	GetClientAbsAngles(iClient, fAngles);
-
+	
 	GetClientEyePosition(iClient, fCOrigin);
 
 	GetClientEyeAngles(iClient, fCAngles);
@@ -31,18 +24,18 @@ int SpawnBarricade(int iClient)
 	}
 	
 	//Lmao
-	//int iEnt = CreateEntityByName("prop_physics_override");
+	int iEnt = CreateEntityByName("prop_physics_override");
 	
-	int iEnt = CreateEntityByName("prop_dynamic_override");
+	//int iEnt = CreateEntityByName("prop_dynamic_override");
 	
 	if (!IsValidEntity(iEnt))
 		return -1;
 		
 	DispatchKeyValue(iEnt, "model", BarricadeModel);
 	
-	SetEntProp(iEnt, Prop_Data, "m_CollisionGroup", 5);
-	SetEntProp(iEnt, Prop_Data, "m_usSolidFlags", 16);
-	SetEntProp(iEnt, Prop_Data, "m_nSolidType", 6);
+	//SetEntProp(iEnt, Prop_Data, "m_CollisionGroup", 5);
+	//SetEntProp(iEnt, Prop_Data, "m_usSolidFlags", 16);
+	//SetEntProp(iEnt, Prop_Data, "m_nSolidType", 6);
 
 	DispatchSpawn(iEnt);
 
