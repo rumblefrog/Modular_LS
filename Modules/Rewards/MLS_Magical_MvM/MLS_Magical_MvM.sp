@@ -26,7 +26,7 @@ Handle ManaHud;
 
 enum Spell
 {
-	Spell_Fireball = 100, //P0L30
+	Spell_Fireball = 100, //P0L20
 	Spell_Meteorite = 300, //P1L30
 	Spell_MeteoriteShower = 600, //P2L20
 	Spell_LightningOrb = 200, //P325
@@ -36,6 +36,7 @@ enum Spell
 }
 
 #include "Spells/Basic.inc"
+#include "Spells/Barricade.inc"
 
 public Plugin myinfo = 
 {
@@ -150,6 +151,8 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 				CastBasicSpell(client, Spell_Meteorite);
 			case Spell_LightningOrb:
 				CastBasicSpell(client, Spell_LightningOrb);
+			case Spell_Barricade:
+				SpawnBarricade(client);
 			default:
 				MLS_PrintToClient(client, "Not yet implemented!"); //TODO: REMOVE
 		}
@@ -163,7 +166,7 @@ bool CanUseSpell(int client, Spell spell)
 	switch (spell)
 	{
 		case Spell_Fireball:
-			return IsAERank(client, 0, 30);
+			return IsAERank(client, 0, 20);
 		case Spell_Meteorite:
 			return IsAERank(client, 1, 30);
 		case Spell_MeteoriteShower:
@@ -185,7 +188,7 @@ bool CanUseSpell(int client, Spell spell)
 
 public Action Timer_ManaHud(Handle timer)
 {
-	SetHudTextParams(0.6, 0.90, 0.6, 42, 42, 214, 0);
+	SetHudTextParams(0.4, 0.85, 0.6, 42, 42, 214, 0);
 	
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -287,9 +290,13 @@ public void PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 
 public void PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
+	char buffer[64];
+	
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	
-	PrintToChatAll("%i has been killed", client);
+	GetEntityClassname(client, buffer, sizeof buffer);
+	
+	PrintToChatAll("%s has been killed", buffer);
 }
 
 void GenerateProgressBar(int value, int base, char[] buffer, int size)
@@ -331,4 +338,25 @@ public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 	
 	if (DoubleEqual(level, prestige, 50, 1))	
 		MLS_PrintToClient(client, "You have unlocked {chartreuse}+60% Mana Regen{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 20, 0))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Fireball Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 30, 1))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Metorite Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 20, 2))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Metorite Shower Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 25, 3))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Lightning Orb Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 40, 3))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Shield Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 10, 4))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}Barricade Spell{grey}!.");
+		
+	if (DoubleEqual(level, prestige, 30, 4))
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}EMP Spell{grey}!.");
 }

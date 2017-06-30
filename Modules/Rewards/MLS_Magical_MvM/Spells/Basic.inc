@@ -2,6 +2,9 @@ int CastBasicSpell(int client, Spell spell)
 {
 	if (!CanUseSpell(client, spell))
 		return -1;
+		
+	if (!DrainSpellMana(client, spell))
+		return -1;
 	
 	char strEntname[45];
 	float vAngles[3], vPosition[3];
@@ -23,9 +26,6 @@ int CastBasicSpell(int client, Spell spell)
 	int iSpell = CreateEntityByName(strEntname);
 	
 	if(!IsValidEntity(iSpell))
-		return -1;
-		
-	if (!DrainSpellMana(client, spell))
 		return -1;
 	
 	float vVelocity[3], vBuffer[3];
