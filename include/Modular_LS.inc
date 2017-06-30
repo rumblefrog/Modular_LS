@@ -73,6 +73,23 @@ stock void MLS_AddXPToAll(int xp, bool bonus = true)
 			MLS_AddXP(i, xp, bonus);
 }
 
+
+/**
+* Check if client data is loaded
+* 
+* @param client			Client Index
+* @return				True if loaded, false otherwise
+*/
+native bool MLS_IsLoaded(int client);
+
+/**
+* Called when data is loaded for a client
+*
+* @param client			Client Index
+* @noreturn
+*/
+forward void MLS_OnClientDataLoaded(int client);
+
 /**
 * Called whenever a client levels up
 *
@@ -206,5 +223,6 @@ public __pl_Modular_LS_SetNTVOptional()
 	MarkNativeAsOptional("MLS_GetPrestigeTitle");
 	MarkNativeAsOptional("MLS_AddXP");
 	MarkNativeAsOptional("MLS_PrintToClient");
+	MarkNativeAsOptional("MLS_IsLoaded");
 }
 #endif

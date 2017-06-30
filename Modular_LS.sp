@@ -64,6 +64,7 @@ char LSPL_Titles[6][] = {
 Database hDB;
 
 bool Verbose;
+bool IsLoaded[MAXPLAYERS + 1] = { false, ... };
 
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
@@ -73,8 +74,10 @@ int XPAtLevel[MAXPLAYERS + 1] =  { -1, ... };
 int XPToNextLevel[MAXPLAYERS + 1] =  { -1, ... };
 
 Handle Progression_Hud;
+
 Handle LevelForward;
 Handle PrestigeForward;
+Handle LoadedForward;
 
 char ProgressBar[MAXPLAYERS + 1][64];
 int colors[MAXPLAYERS + 1][3];
@@ -110,6 +113,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("MLS_GetPrestigeTitle", Native_GetPrestigeTitle);
 	CreateNative("MLS_AddXP", Native_AddXP);
 	CreateNative("MLS_PrintToClient", Native_PrintToClient);
+	CreateNative("MLS_IsLoaded", Native_IsLoaded);
 	
 	return APLRes_Success;
 }
@@ -128,13 +132,14 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_prestige", CmdPrestige, "Prestige!");
 	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
-	RegAdminCmd("sm_mls_addxp", CmdAddXP, ADMFLAG_ROOT, "DEBUG: Add XP");
+	RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: ROOT PERMISSION FOR RELEASE
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
 	
 	Progression_Hud = CreateHudSynchronizer();
 	
 	LevelForward = CreateGlobalForward("MLS_OnClientLeveledUp", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 	PrestigeForward = CreateGlobalForward("MLS_OnClientPrestige", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
+	LoadedForward = CreateGlobalForward("MLS_OnClientDataLoaded", ET_Ignore, Param_Cell);
 }
 
 public void OnMapStart()
@@ -330,7 +335,7 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 
 public void OnClientPostAdminCheck(int client)
 {
-	if (IsFakeClient(client))
+	if (!IsValidClientExcludeData(client))
 		return;
 	
 	char Select_Query[1024], Client_SteamID64[32];
@@ -377,6 +382,14 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	Prestige[client] = results.FetchInt(3);
 	
 	CalculateValues(client);
+	
+	IsLoaded[client] = true;
+	
+	Call_StartForward(LoadedForward);
+	
+	Call_PushCell(client);
+	
+	Call_Finish();
 }
 
 public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any client)
@@ -393,6 +406,14 @@ public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[
 	Prestige[client] = 0;
 	
 	CalculateValues(client);
+	
+	IsLoaded[client] = true;
+	
+	Call_StartForward(LoadedForward);
+	
+	Call_PushCell(client);
+	
+	Call_Finish();
 }
 
 int GetXPValue(int client, int base_xp)
@@ -607,6 +628,16 @@ bool IsValidClient(int iClient, bool bAlive = false)
 	return false;
 }
 
+bool IsValidClientExcludeData(int iClient, bool bAlive = false)
+{
+	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient) && (bAlive == false || IsPlayerAlive(iClient)))
+	{
+		return true;
+	}
+
+	return false;
+}
+
 void GenerateProgressBar(int value, int base, char[] buffer, int size)
 {
 	Format(buffer, size, "");
@@ -737,9 +768,6 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 	
 	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
-	
-	if (Prestige[client] == -1 || Prestige[client] > 5)
-		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid prestige data for client %d", client);
 		
 	int buffer_size = GetNativeCell(2);
 	
@@ -757,9 +785,9 @@ public int Native_AddXP(Handle plugin, int numParams)
 	
 	if (!IsValidClient(client))
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
-		
+	
 	if (!CanGainXP(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Invalid prestige data for client %d", client);
+		return -1;
 		
 	int buffer = GetNativeCell(2);
 		
@@ -793,4 +821,17 @@ public int Native_PrintToClient(Handle plugin, int numParams)
 	CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}%s", buffer);
 	
 	return 0;
+}
+
+public int Native_IsLoaded(Handle plugin, int numParams)
+{
+	if (numParams < 1)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
+		
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClientExcludeData(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+		
+	return IsLoaded[client];
 }
