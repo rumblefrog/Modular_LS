@@ -18,6 +18,8 @@ int CastBasicSpell(int client, Spell spell)
 			strEntname = "tf_projectile_spellfireball";
 		case Spell_Meteorite:
 			strEntname = "tf_projectile_spellmeteorshower";
+		case Spell_Teleport:
+			strEntname = "tf_projectile_spelltransposeteleport";
 		case Spell_LightningOrb:
 			strEntname = "tf_projectile_lightningorb";
 	}
@@ -32,9 +34,9 @@ int CastBasicSpell(int client, Spell spell)
 	
 	GetAngleVectors(vAngles, vBuffer, NULL_VECTOR, NULL_VECTOR);
 	
-	vVelocity[0] = vBuffer[0]*1400.0; //Suggested by Groovy
-	vVelocity[1] = vBuffer[1]*1400.0;
-	vVelocity[2] = vBuffer[2]*1400.0;
+	vVelocity[0] = vBuffer[0]*2000.0;
+	vVelocity[1] = vBuffer[1]*2000.0;
+	vVelocity[2] = vBuffer[2]*2000.0;
 	
 	SetEntPropEnt(iSpell, Prop_Send, "m_hOwnerEntity", client);
 	SetEntProp(iSpell,    Prop_Send, "m_bCritical", (GetRandomInt(0, 100) <= 5)? 1 : 0, 1);

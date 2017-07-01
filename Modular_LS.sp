@@ -80,7 +80,7 @@ char LSRL_Titles[LSRL_Count][] = {
 
 	"Chief",
 	"Tester",
-	"Apex",
+	"Spark",
 	"Member",
 	""
 

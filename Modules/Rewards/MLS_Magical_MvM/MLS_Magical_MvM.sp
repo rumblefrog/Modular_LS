@@ -5,6 +5,7 @@
 
 #include <sourcemod>
 #include <sdktools>
+#include <tf2_stocks>
 #include <Modular_LS>
 
 #pragma newdecls required
@@ -30,7 +31,7 @@ enum Spell
 {
 	Spell_Fireball = 100, //P0L20
 	Spell_Meteorite = 300, //P1L30
-	Spell_MeteoriteShower = 600, //P2L20
+	Spell_Teleport = 80, //P2L20
 	Spell_LightningOrb = 200, //P325
 	Spell_Shield = 120, //P3L40
 	Spell_Barricade = 500, //P4L10
@@ -41,6 +42,7 @@ enum Spell
 #include "Spells/Basic.inc"
 #include "Spells/Barricade.inc"
 #include "Spells/Shield.inc"
+#include "Spells/EMP.inc"
 
 public Plugin myinfo = 
 {
@@ -84,9 +86,9 @@ public Action CmdInfiniteMana(int client, int args)
 		return Plugin_Handled;
 		
 	if (!InfiniteMana[client])
-		MLS_PrintToClient(client, "{lightseagreen}[MaxDB] {grey}Enabled Infinite Mana");
+		MLS_PrintToClient(client, "Enabled Infinite Mana");
 	else
-		MLS_PrintToClient(client, "{lightseagreen}[MaxDB] {grey}Disabled Infinite Mana");
+		MLS_PrintToClient(client, "Disabled Infinite Mana");
 		
 	InfiniteMana[client] = !InfiniteMana[client];
 	
@@ -117,10 +119,10 @@ void DisplaySpellBook(int client)
 		SB.AddItem(CostBuffer, DBuffer);
 	}
 	
-	if (CanUseSpell(client, Spell_MeteoriteShower))
+	if (CanUseSpell(client, Spell_Teleport))
 	{
-		IntToString(view_as<int>(Spell_MeteoriteShower), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Meteorite Shower [%s]", CostBuffer);
+		IntToString(view_as<int>(Spell_Teleport), CostBuffer, sizeof CostBuffer);
+		Format(DBuffer, sizeof DBuffer, "Teleport [%s]", CostBuffer);
 		SB.AddItem(CostBuffer, DBuffer);
 	}
 	
@@ -147,7 +149,7 @@ void DisplaySpellBook(int client)
 	
 	if (CanUseSpell(client, Spell_EMP))
 	{
-		IntToString(view_as<int>(Spell_MeteoriteShower), CostBuffer, sizeof CostBuffer);
+		IntToString(view_as<int>(Spell_EMP), CostBuffer, sizeof CostBuffer);
 		Format(DBuffer, sizeof DBuffer, "EMP [%s]", CostBuffer);
 		SB.AddItem(CostBuffer, DBuffer);
 	}
@@ -175,12 +177,16 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 				CastBasicSpell(client, Spell_Fireball);
 			case Spell_Meteorite:
 				CastBasicSpell(client, Spell_Meteorite);
+			case Spell_Teleport:
+				CastBasicSpell(client, Spell_Teleport);
 			case Spell_LightningOrb:
 				CastBasicSpell(client, Spell_LightningOrb);
 			case Spell_Shield:
 				CastShield(client);
 			case Spell_Barricade:
 				SpawnBarricade(client);
+			case Spell_EMP:
+				CastEMP(client);
 			default:
 				MLS_PrintToClient(client, "Not yet implemented!"); //TODO: REMOVE
 			}
@@ -199,7 +205,7 @@ bool CanUseSpell(int client, Spell spell)
 			return IsAERank(client, 0, 20);
 		case Spell_Meteorite:
 			return IsAERank(client, 1, 30);
-		case Spell_MeteoriteShower:
+		case Spell_Teleport:
 			return IsAERank(client, 2, 20);
 		case Spell_LightningOrb:
 			return IsAERank(client, 3, 25);
