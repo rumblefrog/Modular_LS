@@ -3,6 +3,15 @@
 #endif
 #define _Modular_LS_included
 
+enum LSRL
+{
+	LSRL_Admin,
+	LSRL_Tester,
+	LSRL_Donor,
+	LSRL_Member,
+	LSRL_Normal,
+	LSRL_Count
+}
 
 /**
 * Get client level
@@ -19,6 +28,14 @@ native int MLS_GetUserLevel(int client);
 * @return				User Prestige (-1 If Invalid Data)
 */
 native int MLS_GetUserPrestige(int client);
+
+/**
+* Get client rank
+* 
+* @param client			Client Index
+* @return				User Prestige (-1 If Invalid Data)
+*/
+native LSRL MLS_GetUserRank(int client);
 
 /**
 * Get client prestige colors
@@ -47,6 +64,16 @@ native int MLS_GetPrestigeColorHex(int client);
 * @noreturn
 */
 native void MLS_GetPrestigeTitle(char[] buffer, int size, int client);
+
+/**
+* Get client rank title
+* 
+* @param buffer			Buffer Reference
+* @param size			Buffer Size
+* @param client			Client Index
+* @noreturn
+*/
+native void MLS_GetRankTitle(char[] buffer, int size, int client);
 
 
 /**
@@ -218,9 +245,11 @@ public __pl_Modular_LS_SetNTVOptional()
 {
 	MarkNativeAsOptional("MLS_GetUserLevel");
 	MarkNativeAsOptional("MLS_GetUserPrestige");
+	MarkNativeAsOptional("MLS_GetUserRank");
 	MarkNativeAsOptional("MLS_GetPrestigeColorRGB");
 	MarkNativeAsOptional("MLS_GetPrestigeColorHex");
 	MarkNativeAsOptional("MLS_GetPrestigeTitle");
+	MarkNativeAsOptional("MLS_GetRankTitle");
 	MarkNativeAsOptional("MLS_AddXP");
 	MarkNativeAsOptional("MLS_PrintToClient");
 	MarkNativeAsOptional("MLS_IsLoaded");

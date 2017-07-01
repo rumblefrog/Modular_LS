@@ -306,7 +306,10 @@ bool AddMana(int client, int amount)
 	if (Mana[client] >= ManaPool[client])
 		return false;
 		
-	Mana[client] += amount;
+	if ((Mana[client] + amount) > ManaPool[client])
+		Mana[client] = ManaPool[client];
+	else
+		Mana[client] += amount;
 	
 	return true;
 }

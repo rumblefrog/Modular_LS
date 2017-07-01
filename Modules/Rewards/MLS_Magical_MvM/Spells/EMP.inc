@@ -1,0 +1,4 @@
+void CastEMP(int client)
+{
+	
+}

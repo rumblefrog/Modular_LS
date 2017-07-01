@@ -1,15 +1,16 @@
 #pragma semicolon 1
 
-#define DEBUG
-
 #define PLUGIN_AUTHOR "Fishy"
-#define PLUGIN_VERSION "0.8.0"
+#define PLUGIN_VERSION "0.9.0"
 
 #include <sourcemod>
 #include <sdktools>
 #include <morecolors>
+#include <SteamWorks>
 #undef REQUIRE_PLUGIN
 #include <EventLogs>
+#undef REQUIRE_EXTENSIONS
+#include <steamtools>
 
 #pragma newdecls required
 
@@ -30,13 +31,28 @@
 #define Sound_LVL_Absolute "sound/ls/lvl.wav"
 #define Sound_Prestige_Absolute "sound/ls/prestige.wav"
 
+#define MemberGroupID32 28307369
+#define TesterGroupID32 29292279
+
 enum LSPL
 {
 	LSPL_0,
 	LSPL_1,
 	LSPL_2,
 	LSPL_3,
-	LSPL_4
+	LSPL_4,
+	LSPL_5,
+	LSPL_Count
+}
+
+enum LSRL
+{
+	LSRL_Admin,
+	LSRL_Tester,
+	LSRL_Donor,
+	LSRL_Member,
+	LSRL_Normal,
+	LSRL_Count
 }
 
 enum LSPL_Multiplier
@@ -49,7 +65,7 @@ enum LSPL_Multiplier
 	LSPL_Multiplier_Invalid
 }
 
-char LSPL_Titles[6][] = {
+char LSPL_Titles[LSPL_Count][] = {
 
 	"D",
 	"C",
@@ -60,11 +76,24 @@ char LSPL_Titles[6][] = {
 
 };
 
+char LSRL_Titles[LSRL_Count][] = {
+
+	"Chief",
+	"Tester",
+	"Apex",
+	"Member",
+	""
+
+};
+
 //<!-- Main -->
 Database hDB;
 
 bool Verbose;
-bool IsLoaded[MAXPLAYERS + 1] = { false, ... };
+bool IsLoaded[MAXPLAYERS + 1];
+
+bool InMemberGroup[MAXPLAYERS + 1];
+bool InTesterGroup[MAXPLAYERS + 1];
 
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
@@ -108,9 +137,11 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 	CreateNative("MLS_GetUserLevel", Native_GetUserLevel);
 	CreateNative("MLS_GetUserPrestige", Native_GetUserPrestige);
+	CreateNative("MLS_GetUserRank", Native_GetUserRank);
 	CreateNative("MLS_GetPrestigeColorRGB", Native_GetPrestigeColorRGB);
 	CreateNative("MLS_GetPrestigeColorHex", Native_GetPrestigeColorHex);
 	CreateNative("MLS_GetPrestigeTitle", Native_GetPrestigeTitle);
+	CreateNative("MLS_GetRankTitle", Native_GetRankTitle);
 	CreateNative("MLS_AddXP", Native_AddXP);
 	CreateNative("MLS_PrintToClient", Native_PrintToClient);
 	CreateNative("MLS_IsLoaded", Native_IsLoaded);
@@ -134,6 +165,9 @@ public void OnPluginStart()
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
 	RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: ROOT PERMISSION FOR RELEASE
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
+	
+	RegAdminCmd("mls_core_donor_permission", CmdVoid, ADMFLAG_RESERVATION);
+	RegAdminCmd("mls_core_admin_permission", CmdVoid, ADMFLAG_GENERIC);
 	
 	Progression_Hud = CreateHudSynchronizer();
 	
@@ -162,7 +196,7 @@ public Action Timer_Progression_Hud(Handle hTimer)
 			GetColorRGB(colors[iClient], iClient);
 			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[iClient][0], colors[iClient][1], colors[iClient][2], 0);
 					
-			if (Prestige[iClient] != 5)
+			if (Prestige[iClient] != MaxPL)
 			{
 				if (Level[iClient] == -1 || XPAtLevel[iClient] == -1 || XPToNextLevel[iClient] == -1)
 					ShowSyncHudText(iClient, Progression_Hud, "N/A");
@@ -175,6 +209,11 @@ public Action Timer_Progression_Hud(Handle hTimer)
 				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige");
 		}
 	}
+}
+
+public Action CmdVoid (int client, int args)
+{
+	return Plugin_Handled;
 }
 
 public Action CmdToggleDebug(int client, int args)
@@ -267,7 +306,7 @@ public Action CmdPrestige(int client, int args)
 	}
 		
 	
-	if (Prestige[client] >= 5)
+	if (Prestige[client] >= MaxPL)
 	{
 		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
 			
@@ -276,9 +315,9 @@ public Action CmdPrestige(int client, int args)
 	
 	int UserLevel = GetUserLevel(client);
 	
-	if (UserLevel != 50 || UserLevel == -1)
+	if (UserLevel != MaxPLL || UserLevel == -1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You can only prestige at level 50!");
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You can only prestige at level %i!", MaxPLL);
 			
 		return Plugin_Handled;
 	}
@@ -341,6 +380,9 @@ public void OnClientPostAdminCheck(int client)
 	char Select_Query[1024], Client_SteamID64[32];
 	
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	
+	SteamWorks_GetUserGroupStatus(client, MemberGroupID32);
+	SteamWorks_GetUserGroupStatus(client, TesterGroupID32);
 	
 	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Modular_LS WHERE `steamid` = '%s'", Client_SteamID64);
 	
@@ -418,14 +460,19 @@ public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[
 
 int GetXPValue(int client, int base_xp)
 {
+	float MaxBase = 1.0;
+	
+	if (InMemberGroup[client])
+		MaxBase += 0.2;
+	
 	float SessionTime = GetClientTime(client);
-	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + 1.0);
+	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + MaxBase);
 	int MaxBonusSession = (60 * 60 * MaxBonusHour);
 	
 	if (SessionTime >= MaxBonusSession)
 		return RoundToNearest(base_xp * MaxBonusMultiplier);
 	else
-		return RoundToNearest(base_xp * ((SessionTime / MaxBonusSession) + 1.0));
+		return RoundToNearest(base_xp * ((SessionTime / MaxBonusSession) + MaxBase));
 }
 
 void AddXPToUser(int client, int xp)
@@ -505,7 +552,7 @@ bool CanGainXP(int client)
 	
 	CalculateValues(client);
 	
-	if (UserLevel >= 50)
+	if (UserLevel >= MaxPLL)
 	{
 		if (Verbose)
 			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
@@ -513,7 +560,7 @@ bool CanGainXP(int client)
 		return false;
 	}
 	
-	if (Prestige[client] >= 5)
+	if (Prestige[client] >= MaxPL)
 	{
 		if (Verbose)
 			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
@@ -546,9 +593,9 @@ void CalculateValues(int client)
 		return;
 	}
 	
-	if (Level[client] >= 50)
+	if (Level[client] >= MaxPLL)
 	{
-		int MaxXPAtCurrent = GetXPFromLevel(50, Multiplier);
+		int MaxXPAtCurrent = GetXPFromLevel(MaxPLL, Multiplier);
 		XPToNextLevel[client] = MaxXPAtCurrent;
 		XPAtLevel[client] = MaxXPAtCurrent;
 		return;
@@ -601,8 +648,8 @@ int GetUserLevel(int client)
 					
 	int result = RoundToFloor( 1 + Logarithm((XP[client] / BaseXP), view_as<float>(multiplier)));
 	
-	if (result >= 50)
-		return 50;
+	if (result >= MaxPLL)
+		return MaxPLL;
 	else
 		return result;
 }
@@ -701,6 +748,82 @@ int GetColorHex(int client)
 	return 0xd3d3dd;
 }
 
+LSRL GetUserRank(int client)
+{
+	if (CheckCommandAccess(client, "mls_core_admin_permission", ADMFLAG_GENERIC))
+		return LSRL_Admin;
+		
+	if (InTesterGroup[client])
+		return LSRL_Tester;
+		
+	if (CheckCommandAccess(client, "mls_core_donor_permission", ADMFLAG_RESERVATION))
+		return LSRL_Donor;
+		
+	if (InMemberGroup[client])
+		return LSRL_Member;
+		
+	return LSRL_Normal;
+}
+
+public int SteamWorks_OnClientGroupStatus(int authid, int groupid, bool isMember, bool isOfficer)
+{
+	
+	if (groupid != MemberGroupID32 && groupid != TesterGroupID32)
+		return;
+	
+	int iClient = GetUserFromAuthID(authid);	
+	
+	if (iClient == -1)
+		return;
+			
+	if (isMember || isOfficer)
+	{
+		if (groupid == MemberGroupID32)
+			InMemberGroup[iClient] = true;
+		else if (groupid == TesterGroupID32)
+			InTesterGroup[iClient] = true;
+	}
+}
+
+//In cases where Steamtools is also loaded and Steamworks fails to see the callback
+public int Steam_GroupStatusResult(int client, int groupAccountID, bool groupMember, bool groupOfficer)
+{
+	
+	if (groupAccountID != MemberGroupID32 && groupAccountID != TesterGroupID32)
+		return;	
+	
+	if (client == -1)
+		return;
+			
+	if (groupMember || groupOfficer)
+	{
+		if (groupAccountID == MemberGroupID32)
+			InMemberGroup[client] = true;
+		else if (groupAccountID == TesterGroupID32)
+			InTesterGroup[client] = true;
+	}
+}
+
+public int GetUserFromAuthID(int authid)
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if(IsClientInGame(i)) {
+            char charauth[64];
+            GetClientAuthId(i, AuthId_Steam3, charauth, sizeof(charauth));
+               
+            char charauth2[64];
+            IntToString(authid, charauth2, sizeof(charauth2));
+           
+            if(StrContains(charauth, charauth2, false) > -1)
+            {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
 public int Native_GetUserLevel(Handle plugin, int numParams)
 {
 	if (numParams < 1)
@@ -725,6 +848,19 @@ public int Native_GetUserPrestige(Handle plugin, int numParams)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
 		
 	return Prestige[client];
+}
+
+public int Native_GetUserRank(Handle plugin, int numParams)
+{
+	if (numParams < 1)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing client parameter");
+	
+	int client = GetNativeCell(1);
+	
+	if (!IsValidClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+		
+	return view_as<int>(GetUserRank(client));
 }
 
 public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
@@ -772,6 +908,23 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 	int buffer_size = GetNativeCell(2);
 	
 	SetNativeString(1, LSPL_Titles[Prestige[client]], buffer_size);
+	
+	return 0;
+}
+
+public int Native_GetRankTitle(Handle plugin, int numParams)
+{
+	if (numParams < 3)
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
+		
+	int client = GetNativeCell(3);
+	
+	if (!IsValidClient(client))
+		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+		
+	int buffer_size = GetNativeCell(2);
+	
+	SetNativeString(1, LSRL_Titles[view_as<int>(GetUserRank(client))], buffer_size);
 	
 	return 0;
 }
