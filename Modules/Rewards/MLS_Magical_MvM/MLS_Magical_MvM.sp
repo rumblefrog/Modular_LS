@@ -59,6 +59,8 @@ public void OnPluginStart()
 	
 	RegConsoleCmd("sm_infinitemana", CmdInfiniteMana, "[Debug] Infinite Mana"); //TODO: SET TO ROOT ONLY
 	
+	RegConsoleCmd("sm_mmvm_dump", CmdDump, "Dump user data");
+	
 	ManaHud = CreateHudSynchronizer();
 	
 	HookEvent("player_spawn", PlayerSpawn, EventHookMode_Post);
@@ -76,6 +78,17 @@ public Action CmdSpellBook(int client, int args)
 		return Plugin_Handled;
 		
 	DisplaySpellBook(client);
+	
+	return Plugin_Handled;
+}
+
+public Action CmdDump(int client, int args)
+{
+	PrintToConsole(client, "Mana: %f", Mana[client]);
+	PrintToConsole(client, "ManaPool: %i", ManaPool[client]);
+	PrintToConsole(client, "InfiniteMana: %i", InfiniteMana[client]);
+	
+	PrintToConsole(client, "<-------------------------->");
 	
 	return Plugin_Handled;
 }
@@ -223,20 +236,30 @@ bool CanUseSpell(int client, Spell spell)
 }
 
 public Action Timer_ManaHud(Handle timer)
-{
-	SetHudTextParams(0.4, 0.85, 0.6, 42, 42, 214, 0);
-	
+{	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsValidClient(i))
 		{
 			if (!IsValidMagic(i))
 			{
+				SetHudTextParams(-1.0, 0.85, 0.6, 42, 42, 214, 0);
 				ShowSyncHudText(i, ManaHud, "N/A");
 			} else
 			{
 				GenerateProgressBar(Mana[i], ManaPool[i], ManaBar[i], sizeof ManaBar[]);
 				ShowSyncHudText(i, ManaHud, "%s %i/%i", ManaBar[i], Mana[i], ManaPool[i]);
+				
+				if (Mana[i] == -1 || ManaPool[i] == -1)
+				{
+					SetHudTextParams(-1.0, 0.85, 0.6, 42, 42, 214, 0);
+					ShowSyncHudText(i, ManaHud, "Level Up To Begin!");
+				} else
+				{
+					SetHudTextParams(0.4, 0.85, 0.6, 42, 42, 214, 0);
+					GenerateProgressBar(Mana[i], ManaPool[i], ManaBar[i], sizeof ManaBar[]);
+					ShowSyncHudText(i, ManaHud, "%s %i/%i", ManaBar[i], Mana[i], ManaPool[i]);
+				}
 			}
 		}
 	}
@@ -249,11 +272,9 @@ public void OnClientPostAdminCheck(int client)
 		
 	if (!MLS_IsLoaded(client))
 		return;
-		
-	int Prestige = MLS_GetUserPrestige(client);
-	int Level = MLS_GetUserLevel(client);
 	
-	ManaPool[client]  = (ManaPerPrestige * Prestige) + (Level * ManaPerLevel);
+	CalculatePool(client);
+	
 	Mana[client] = ManaPool[client];
 }
 
@@ -261,12 +282,12 @@ public void MLS_OnClientDataLoaded(int client)
 {
 	if (!IsValidClient(client))
 		return;
-		
-	int Prestige = MLS_GetUserPrestige(client);
-	int Level = MLS_GetUserLevel(client);
+			
+	CalculatePool(client);
 	
-	ManaPool[client]  = (ManaPerPrestige * Prestige) + (Level * ManaPerLevel);
 	Mana[client] = ManaPool[client];
+	
+	MLS_PrintToClient(client, "Successfully loaded your data"); //TODO: REMOVE
 }
 
 public Action Timer_Regenerate(Handle timer, any data)
@@ -381,12 +402,23 @@ bool IsValidMagic(int client)
 	return true;
 }
 
+void CalculatePool(int client)
+{
+	if (!IsValidMagic(client))
+		return;
+		
+	int Prestige = MLS_GetUserPrestige(client);
+	int Level = MLS_GetUserLevel(client);
+	
+	ManaPool[client]  = (ManaPerPrestige * Prestige) + (Level * ManaPerLevel);
+}
+
 public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 {
 	if (!IsValidMagic(client))
 		return;
 	
-	ManaPool[client]  = (ManaPerPrestige * prestige) + (level * ManaPerLevel);
+	CalculatePool(client);
 	
 	if (DoubleEqual(level, prestige, 50, 1))	
 		MLS_PrintToClient(client, "You have unlocked {chartreuse}+60% Mana Regen{grey}!.");
