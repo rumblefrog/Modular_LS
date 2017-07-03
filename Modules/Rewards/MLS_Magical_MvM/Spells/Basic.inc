@@ -58,6 +58,12 @@ int CastBasicSpell(int client, Spell spell)
 		}
 	}*/
 	
+	switch(spell)
+	{
+		case Spell_Fireball:
+			EmitSoundToClient(client, FireballSound, iSpell);
+	}
+	
 	SetVariantInt(iTeam);
 	AcceptEntityInput(iSpell, "TeamNum", -1, -1, 0);
 	SetVariantInt(iTeam);

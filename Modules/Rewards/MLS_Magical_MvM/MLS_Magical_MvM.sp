@@ -13,10 +13,11 @@
 #define Bar_Fill "█"
 #define Bar_Empty "░"
 
+#define BaseMana 500
 #define BaseTime 0.1
 
-#define ManaPerLevel 5
-#define ManaPerPrestige 250
+#define ManaPerLevel 10
+#define ManaPerPrestige 500
 
 char ManaBar[MAXPLAYERS + 1][64];
 
@@ -29,14 +30,39 @@ Handle ManaHud;
 
 enum Spell
 {
-	Spell_Fireball = 100, //P0L20
-	Spell_Meteorite = 300, //P1L30
-	Spell_Teleport = 80, //P2L20
-	Spell_LightningOrb = 200, //P325
-	Spell_Shield = 120, //P3L40
-	Spell_Barricade = 500, //P4L10
-	Spell_EMP = 1000, //P4L30
+	Spell_Fireball, //NONE
+	Spell_Meteorite, //P1L30
+	Spell_Teleport, //P2L20
+	Spell_LightningOrb, //P325
+	Spell_Shield, //P3L40
+	Spell_Barricade, //P4L10
+	Spell_EMP, //P4L30
+	Spell_Count
 }
+
+enum Spell_Cost
+{
+	Fireball_Cost = 100,
+	Meteorite_Cost = 300,
+	Teleport_Cost = 80,
+	LightningOrb_Cost = 200,
+	Shield_Cost = 120,
+	Barricade_Cost = 500,
+	EMP_Cost = 1000
+}
+
+enum Spell_Cooldown
+{
+	float:Fireball_Cooldown = 2.0,
+	float:Meteorite_Cooldown = 8.0,
+	float:Teleport_Cooldown = 3.0,
+	float:LightningOrb_Cooldown = 4.0,
+	float:Shield_Cooldown = 10.0,
+	float:Barricade_Cooldown = 70.0,
+	float:EMP_Cooldown = 120.0
+}
+
+float SpellNextUse[MAXPLAYERS + 1][Spell_Count];
 
 #include "Spells/Precache.inc"
 #include "Spells/Basic.inc"
@@ -110,61 +136,56 @@ public Action CmdInfiniteMana(int client, int args)
 
 void DisplaySpellBook(int client)
 {
-	char CostBuffer[16], DBuffer[64];
+	char IndexBuffer[8], DBuffer[64];
 	
 	Menu SB = new Menu(SpellBookCallBack);
 	
 	SB.SetTitle("Spellbook");
 	
-	if (!CanUseSpell(client, Spell_Fireball))
-		SB.AddItem("X", "Level up to obtain spells!", ITEMDRAW_DISABLED);
-	else
-	{
-		IntToString(view_as<int>(Spell_Fireball), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Fireball [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
-	}
+	IntToString(view_as<int>(Spell_Fireball), IndexBuffer, sizeof IndexBuffer);
+	Format(DBuffer, sizeof DBuffer, "Fireball [%i]", Fireball_Cost);
+	SB.AddItem(IndexBuffer, DBuffer);
 	
 	if (CanUseSpell(client, Spell_Meteorite))
 	{
-		IntToString(view_as<int>(Spell_Meteorite), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Meteorite [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_Meteorite), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "Meteorite [%i]", Meteorite_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	if (CanUseSpell(client, Spell_Teleport))
 	{
-		IntToString(view_as<int>(Spell_Teleport), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Teleport [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_Teleport), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "Teleport [%i]", Teleport_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	if (CanUseSpell(client, Spell_LightningOrb))
 	{
-		IntToString(view_as<int>(Spell_LightningOrb), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Lightning Orb [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_LightningOrb), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "Lightning Orb [%i]", LightningOrb_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	if (CanUseSpell(client, Spell_Shield))
 	{
-		IntToString(view_as<int>(Spell_Shield), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Shield [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_Shield), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "Shield [%i]", Shield_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	if (CanUseSpell(client, Spell_Barricade))
 	{
-		IntToString(view_as<int>(Spell_Barricade), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "Barricade [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_Barricade), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "Barricade [%i]", Barricade_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	if (CanUseSpell(client, Spell_EMP))
 	{
-		IntToString(view_as<int>(Spell_EMP), CostBuffer, sizeof CostBuffer);
-		Format(DBuffer, sizeof DBuffer, "EMP [%s]", CostBuffer);
-		SB.AddItem(CostBuffer, DBuffer);
+		IntToString(view_as<int>(Spell_EMP), IndexBuffer, sizeof IndexBuffer);
+		Format(DBuffer, sizeof DBuffer, "EMP [%i]", EMP_Cost);
+		SB.AddItem(IndexBuffer, DBuffer);
 	}
 	
 	SB.Display(client, MENU_TIME_FOREVER);
@@ -215,7 +236,7 @@ bool CanUseSpell(int client, Spell spell)
 	switch (spell)
 	{
 		case Spell_Fireball:
-			return IsAERank(client, 0, 20);
+			return true;
 		case Spell_Meteorite:
 			return IsAERank(client, 1, 30);
 		case Spell_Teleport:
@@ -265,19 +286,6 @@ public Action Timer_ManaHud(Handle timer)
 	}
 }
 
-public void OnClientPostAdminCheck(int client)
-{
-	if (!IsValidClient(client))
-		return;
-		
-	if (!MLS_IsLoaded(client))
-		return;
-	
-	CalculatePool(client);
-	
-	Mana[client] = ManaPool[client];
-}
-
 public void MLS_OnClientDataLoaded(int client)
 {
 	if (!IsValidClient(client))
@@ -297,9 +305,9 @@ public Action Timer_Regenerate(Handle timer, any data)
 		if (IsValidMagic(i))
 		{
 			if (IsAERank(i, 1, 50))
-				AddMana(i, 3);
+				AddMana(i, 1);
 			else
-				AddMana(i, 5);
+				AddMana(i, 3);
 		}
 	}
 }
@@ -312,17 +320,115 @@ bool DrainSpellMana(int client, Spell spell)
 	if (InfiniteMana[client])
 		return true;
 		
-	int amount = view_as<int>(spell);
+	Spell_Cost cost;
+	
+	switch (spell)
+	{
+		case Spell_Fireball:
+			cost = Fireball_Cost;
+		case Spell_Meteorite:
+			cost = Meteorite_Cost;
+		case Spell_Teleport:
+			cost = Teleport_Cost;
+		case Spell_LightningOrb:
+			cost = LightningOrb_Cost;
+		case Spell_Shield:
+			cost = Shield_Cost;
+		case Spell_Barricade:
+			cost = Barricade_Cost;
+		case Spell_EMP:
+			cost = EMP_Cost;
+	}
+	
+	int amount = view_as<int>(cost);
 		
 	if (Mana[client] < amount)
 	{
-		MLS_PrintToClient(client, "You do not have enough mana!");
+		EmitSoundToClient(client, FailSound);
+		PrintHintText(client, "You do not have enough mana!");
+		return false;
+	}
+	
+	if (IsInCoolDown(client, spell))
+	{
+		EmitSoundToClient(client, FailSound);
+		PrintHintText(client, "You cannot use this spell for another %i seconds", GetCoolDownDuration(client, spell));
+		
 		return false;
 	}
 		
 	Mana[client] -= amount;
+	
+	StartCoolDown(client, spell);
 		
 	return true;
+}
+
+bool IsInCoolDown(int client, Spell spell)
+{
+	int iIndex = view_as<int>(spell);
+	
+	float CurrentTime = GetGameTime();
+	
+	return (SpellNextUse[client][iIndex] > CurrentTime);
+}
+
+int GetCoolDownDuration(int client, Spell spell)
+{
+	int iIndex = view_as<int>(spell);
+	
+	if (!IsInCoolDown(client, spell))
+		return -1;
+		
+	float CurrentTime = GetGameTime();
+		
+	return RoundToCeil(SpellNextUse[client][iIndex] - CurrentTime);
+}
+
+stock void GetCoolDownDurationString(int client, Spell spell, char[] buffer, int size)
+{
+	if (!IsInCoolDown(client, spell))
+		return;
+		
+	int Duration;
+	
+	if ((Duration = GetCoolDownDuration(client, spell)) == -1)
+		return;
+
+	int iMinutes = RoundToFloor(float(Duration / 60));
+	int iSeconds = Duration % 60;
+
+	Format(buffer, size, "%i:%i", iMinutes, iSeconds);
+}
+
+void StartCoolDown(int client, Spell spell)
+{
+	int iIndex;
+	
+	float CurrentTime = GetGameTime();
+	float Cooldown;
+	
+	iIndex = view_as<int>(spell);
+					
+	switch (spell)
+	{
+		case Spell_Fireball:
+			Cooldown = view_as<float>(Fireball_Cooldown);
+		case Spell_Meteorite:
+			Cooldown = view_as<float>(Meteorite_Cooldown);
+		case Spell_Teleport:
+			Cooldown = view_as<float>(Teleport_Cooldown);
+		case Spell_LightningOrb:
+			Cooldown = view_as<float>(LightningOrb_Cooldown);
+		case Spell_Shield:
+			Cooldown = view_as<float>(Shield_Cooldown);
+		case Spell_Barricade:
+			Cooldown = view_as<float>(Barricade_Cooldown);
+		case Spell_EMP:
+			Cooldown = view_as<float>(EMP_Cooldown);
+	}
+	
+	SpellNextUse[client][iIndex] = CurrentTime + Cooldown;
 }
 
 bool AddMana(int client, int amount)
@@ -403,14 +509,11 @@ bool IsValidMagic(int client)
 }
 
 void CalculatePool(int client)
-{
-	if (!IsValidMagic(client))
-		return;
-		
+{		
 	int Prestige = MLS_GetUserPrestige(client);
 	int Level = MLS_GetUserLevel(client);
 	
-	ManaPool[client]  = (ManaPerPrestige * Prestige) + (Level * ManaPerLevel);
+	ManaPool[client]  = (ManaPerPrestige * Prestige) + (Level * ManaPerLevel) + BaseMana;
 }
 
 public void MLS_OnClientLeveledUp(int client, int level, int prestige)
@@ -421,10 +524,7 @@ public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 	CalculatePool(client);
 	
 	if (DoubleEqual(level, prestige, 50, 1))	
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}+60% Mana Regen{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 20, 0))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Fireball Spell{grey}!.");
+		MLS_PrintToClient(client, "You have unlocked {chartreuse}3x Faster Mana Regen{grey}!.");
 		
 	if (DoubleEqual(level, prestige, 30, 1))
 		MLS_PrintToClient(client, "You have unlocked {chartreuse}Metorite Spell{grey}!.");
