@@ -10,8 +10,13 @@
 
 #pragma newdecls required
 
+//#define Bar_Fill "█"
+//#define Bar_Empty "░"
+
 #define Bar_Fill "█"
-#define Bar_Empty "░"
+#define Bar_Empty "▓"
+
+#define ManaSymbol "ϟ"
 
 #define BaseMana 500
 #define BaseTime 0.1
@@ -24,19 +29,21 @@ char ManaBar[MAXPLAYERS + 1][64];
 int Mana[MAXPLAYERS + 1] = { -1, ... };
 int ManaPool[MAXPLAYERS + 1] = { -1, ... };
 
+int CurrencyCollected;
+
 bool InfiniteMana[MAXPLAYERS + 1];
 
 Handle ManaHud;
 
 enum Spell
 {
-	Spell_Fireball, //NONE
-	Spell_Meteorite, //P1L30
-	Spell_Teleport, //P2L20
-	Spell_LightningOrb, //P325
-	Spell_Shield, //P3L40
-	Spell_Barricade, //P4L10
-	Spell_EMP, //P4L30
+	Spell_Fireball,
+	Spell_Meteorite,
+	Spell_Teleport,
+	Spell_LightningOrb,
+	Spell_Shield,
+	Spell_Barricade,
+	Spell_EMP,
 	Spell_Count
 }
 
@@ -92,6 +99,8 @@ public void OnPluginStart()
 	HookEvent("player_spawn", PlayerSpawn, EventHookMode_Post);
 	
 	HookEvent("player_death", PlayerDeath, EventHookMode_Post);
+	
+	HookEvent("mvm_pickup_currency", PickUpCurrency, EventHookMode_Post);
 	
 	CreateTimer(0.5, Timer_ManaHud, _, TIMER_REPEAT);
 	
@@ -222,7 +231,7 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 			case Spell_EMP:
 				CastEMP(client);
 			default:
-				MLS_PrintToClient(client, "Not yet implemented!"); //TODO: REMOVE
+				MLS_PrintToClient(client, "Not a valid spell!");
 			}
 		} else
 			MLS_PrintToClient(client, "Cannot cast spell while you are dead.");
@@ -233,22 +242,27 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 
 bool CanUseSpell(int client, Spell spell)
 {
+	LSRL Rank = MLS_GetUserRank(client);
+	
+	if (Rank == LSRL_Admin || Rank == LSRL_Tester) //TODO: Limit to Admin after?
+		return true;
+	
 	switch (spell)
 	{
 		case Spell_Fireball:
 			return true;
 		case Spell_Meteorite:
-			return IsAERank(client, 1, 30);
+			return CurrencyCollected >= 400;
 		case Spell_Teleport:
-			return IsAERank(client, 2, 20);
+			return CurrencyCollected >= 800;
 		case Spell_LightningOrb:
-			return IsAERank(client, 3, 25);
+			return CurrencyCollected >= 1200;
 		case Spell_Shield:
-			return IsAERank(client, 3, 40);
+			return CurrencyCollected >= 1600;
 		case Spell_Barricade:
-			return IsAERank(client, 4, 10);
+			return CurrencyCollected >= 2000;
 		case Spell_EMP:
-			return IsAERank(client, 4, 30);
+			return CurrencyCollected >= 2400;
 		default:
 			return false;
 	}
@@ -268,19 +282,9 @@ public Action Timer_ManaHud(Handle timer)
 				ShowSyncHudText(i, ManaHud, "N/A");
 			} else
 			{
+				SetHudTextParams(0.4, 0.85, 0.6, 42, 42, 214, 0);
 				GenerateProgressBar(Mana[i], ManaPool[i], ManaBar[i], sizeof ManaBar[]);
-				ShowSyncHudText(i, ManaHud, "%s %i/%i", ManaBar[i], Mana[i], ManaPool[i]);
-				
-				if (Mana[i] == -1 || ManaPool[i] == -1)
-				{
-					SetHudTextParams(-1.0, 0.85, 0.6, 42, 42, 214, 0);
-					ShowSyncHudText(i, ManaHud, "Level Up To Begin!");
-				} else
-				{
-					SetHudTextParams(0.4, 0.85, 0.6, 42, 42, 214, 0);
-					GenerateProgressBar(Mana[i], ManaPool[i], ManaBar[i], sizeof ManaBar[]);
-					ShowSyncHudText(i, ManaHud, "%s %i/%i", ManaBar[i], Mana[i], ManaPool[i]);
-				}
+				ShowSyncHudText(i, ManaHud, "%s %s %i/%i", ManaSymbol, ManaBar[i], Mana[i], ManaPool[i]);
 			}
 		}
 	}
@@ -295,7 +299,7 @@ public void MLS_OnClientDataLoaded(int client)
 	
 	Mana[client] = ManaPool[client];
 	
-	MLS_PrintToClient(client, "Successfully loaded your data"); //TODO: REMOVE
+	PrintToConsole(client, "[MaxDB] Successfully loaded your data");
 }
 
 public Action Timer_Regenerate(Handle timer, any data)
@@ -352,7 +356,7 @@ bool DrainSpellMana(int client, Spell spell)
 	if (IsInCoolDown(client, spell))
 	{
 		EmitSoundToClient(client, FailSound);
-		PrintHintText(client, "You cannot use this spell for another %i seconds", GetCoolDownDuration(client, spell));
+		PrintHintText(client, "You cannot use this spell for another %i second", GetCoolDownDuration(client, spell));
 		
 		return false;
 	}
@@ -465,6 +469,13 @@ public void PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 		RemoveShield(client);
 }
 
+public void PickUpCurrency(Event event, const char[] name, bool dontBroadcast)
+{	
+	int cash = event.GetInt("currency");
+	
+	CurrencyCollected += cash;
+}
+
 public void OnPluginEnd()
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -526,21 +537,4 @@ public void MLS_OnClientLeveledUp(int client, int level, int prestige)
 	if (DoubleEqual(level, prestige, 50, 1))	
 		MLS_PrintToClient(client, "You have unlocked {chartreuse}3x Faster Mana Regen{grey}!.");
 		
-	if (DoubleEqual(level, prestige, 30, 1))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Metorite Spell{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 20, 2))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Metorite Shower Spell{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 25, 3))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Lightning Orb Spell{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 40, 3))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Shield Spell{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 10, 4))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}Barricade Spell{grey}!.");
-		
-	if (DoubleEqual(level, prestige, 30, 4))
-		MLS_PrintToClient(client, "You have unlocked {chartreuse}EMP Spell{grey}!.");
 }
