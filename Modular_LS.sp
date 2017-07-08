@@ -95,6 +95,9 @@ bool IsLoaded[MAXPLAYERS + 1];
 bool InMemberGroup[MAXPLAYERS + 1];
 bool InTesterGroup[MAXPLAYERS + 1];
 
+int XP_Gained[MAXPLAYERS + 1] =  { 0, ... };
+int Prestige_Gained[MAXPLAYERS + 1] =  { 0, ... };
+
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
 int Level[MAXPLAYERS + 1] =  { -1, ... };
@@ -127,7 +130,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	if (hDB == INVALID_HANDLE)
 		return APLRes_Failure;
 	
-	char TableCreateSQL[] = "CREATE TABLE IF NOT EXISTS `Modular_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(32) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
+	char TableCreateSQL[] = "CREATE TABLE IF NOT EXISTS `Modular_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(32) NOT NULL , `name` VARCHAR(32) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
 	
 	SQL_SetCharset(hDB, "utf8mb4");
 			
@@ -161,6 +164,11 @@ public void OnTableCreate(Database db, DBResultSet results, const char[] error, 
 public void OnPluginStart()
 {
 	RegConsoleCmd("sm_prestige", CmdPrestige, "Prestige!");
+	
+	RegConsoleCmd("sm_top10", CmdTop10, "Displays Top 10");
+	RegConsoleCmd("sm_rank", CmdRank, "Displays Current Rank");
+	//RegConsoleCmd("sm_session", CmdSession, "Displays Session Data");
+	
 	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
 	RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: ROOT PERMISSION FOR RELEASE
@@ -211,9 +219,35 @@ public Action Timer_Progression_Hud(Handle hTimer)
 	}
 }
 
-public Action CmdVoid (int client, int args)
+public Action CmdVoid(int client, int args)
 {
 	return Plugin_Handled;
+}
+
+public Action CmdTop10(int client, int args)
+{
+	ShowTop10(client);
+	
+	return Plugin_Handled;
+}
+
+public Action CmdRank(int client, int args)
+{
+	ShowRank(client);
+	
+	return Plugin_Handled;
+}
+
+public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
+{
+	if (strcmp(command, "say") == 0 || strcmp(command, "say_team") == 0)
+	{
+		if (strcmp(sArgs, "top10") == 0)
+			ShowTop10(client);
+			
+		if (strcmp(sArgs, "rank") == 0)
+			ShowRank(client);
+	}
 }
 
 public Action CmdToggleDebug(int client, int args)
@@ -360,6 +394,7 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 	
 	XP[client] = 0;
 	Prestige[client]++;
+	Prestige_Gained[client]++;
 	
 	Call_StartForward(PrestigeForward);
 	
@@ -370,6 +405,101 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 	Call_Finish();
 	
 	CalculateValues(client);
+}
+
+void ShowTop10(int client)
+{
+	char Select_Query[128];
+	
+	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Modular_LS ORDER BY `prestige` DESC, `xp` DESC LIMIT 10");
+	
+	hDB.Query(SQL_OnShowTop10, Select_Query, client);
+}
+
+void ShowRank(int client)
+{
+	char Select_Query[512], Client_SteamID64[32];
+	
+	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	
+	Format(Select_Query, sizeof Select_Query, "SELECT rank, total FROM (SELECT ROW_NUMBER() OVER (ORDER BY `prestige` DESC, `xp` DESC) AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total, steamid FROM Modular_LS) sub WHERE sub.steamid = '%s'", Client_SteamID64);
+	
+	hDB.Query(SQL_OnShowRank, Select_Query, client);
+}
+
+public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error, any client)
+{
+	if (results == null)
+	{
+		EL_LogPlugin(LOG_ERROR, "Unable to fetch player rank: %s", error);
+		
+		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Unable to fetch your rank.");
+		
+		if (Verbose)
+			PrintToConsole(client, "Query Error: %s", error);
+		
+		return;
+	}
+	
+	results.FetchRow();
+	
+	char Hex_Name[16], Prefix[64], Client_Name[32];
+	
+	int Pos = results.FetchInt(0);
+	int Total = results.FetchInt(1);
+	int Hex = GetColorHex(client);
+	
+	IntToString(Hex, Hex_Name, sizeof Hex_Name);
+	
+	CAddColor(Hex_Name, Hex);
+	
+	GetUserPrefix(client, Prefix, sizeof Prefix, true);
+	GetClientName(client, Client_Name, sizeof Client_Name);
+	
+	CPrintToChatAll("{lightseagreen}[MaxDB] {grey}Player {lightseagreen}[{%s}%s{lightseagreen}] {chartreuse}%s {grey}is rank {aqua}%i {gray}out of {deepskyblue}%i{grey}.", Hex_Name, Prefix, Client_Name, Pos, Total);
+}
+
+public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error, any client)
+{
+	if (results == null)
+	{
+		EL_LogPlugin(LOG_ERROR, "Unable to fetch top 10: %s", error);
+		
+		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Unable to fetch top 10 data.");
+		
+		if (Verbose)
+			PrintToConsole(client, "Query Error: %s", error);
+		
+		return;
+	}
+	
+	Panel Top10 = new Panel();
+	
+	char Position[128], Name[32], Prefix[64];
+	
+	int Prestige_Buffer, XP_Buffer;
+	
+	Top10.SetTitle("Top 10 Ranking");
+	
+	while (results.FetchRow())
+	{
+		results.FetchString(2, Name, sizeof Name);
+		XP_Buffer = results.FetchInt(3);
+		Prestige_Buffer = results.FetchInt(4);
+		
+		GetUserPrefixFromData(Prestige_Buffer, XP_Buffer, Prefix, sizeof Prefix);
+		
+		Format(Position, sizeof Position, "%s - %s", Name, Prefix);
+		
+		Top10.DrawItem(Position);
+	}
+	
+	Top10.Send(client, VoidMenuHandler, MENU_TIME_FOREVER);
+}
+
+public int VoidMenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+	
 }
 
 public void OnClientPostAdminCheck(int client)
@@ -407,11 +537,13 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	
 	if (results.RowCount == 0)
 	{
-		char Client_SteamID64[32], Insert_Query[1024];
+		char Client_SteamID64[32], Insert_Query[1024], Client_Name[32], Escaped_Client_Name[65];
 	
 		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
+		GetClientName(client, Client_Name, sizeof Client_Name);
+		db.Escape(Client_Name, Escaped_Client_Name, sizeof Escaped_Client_Name);
 		
-		Format(Insert_Query, sizeof Insert_Query, "INSERT INTO Modular_LS (`steamid`) VALUES ('%s')", Client_SteamID64);
+		Format(Insert_Query, sizeof Insert_Query, "INSERT INTO Modular_LS (`steamid`, `name`) VALUES ('%s', '%s')", Client_SteamID64, Escaped_Client_Name);
 		
 		db.Query(SQL_OnCreatePlayerData, Insert_Query, client);
 		
@@ -420,8 +552,8 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	
 	results.FetchRow();
 	
-	XP[client] = results.FetchInt(2);
-	Prestige[client] = results.FetchInt(3);
+	XP[client] = results.FetchInt(3);
+	Prestige[client] = results.FetchInt(4);
 	
 	CalculateValues(client);
 	
@@ -480,11 +612,14 @@ void AddXPToUser(int client, int xp)
 	if (!CanGainXP(client))
 		return;
 	
-	char Update_Query[1024], Client_SteamID64[32];
+	char Update_Query[1024], Client_SteamID64[32], Client_Name[32], Escaped_Client_Name[65];
 	
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientName(client, Client_Name, sizeof Client_Name);
 	
-	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = `xp` + '%u' WHERE `steamid` = '%s'", xp, Client_SteamID64);
+	hDB.Escape(Client_Name, Escaped_Client_Name, sizeof Escaped_Client_Name);
+	
+	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = `xp` + '%u', `name` = '%s' WHERE `steamid` = '%s'", xp, Escaped_Client_Name, Client_SteamID64);
 	
 	DataPack pData = CreateDataPack();
 	WritePackCell(pData, client);
@@ -508,6 +643,8 @@ public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] err
 	}
 	
 	XP[client] += xp;
+	XP_Gained[client] += xp;
+	
 	CalculateValues(client);
 }
 
@@ -517,6 +654,27 @@ LSPL_Multiplier GetMultiplierByPrestige(int client)
 		return LSPL_Multiplier_Invalid;
 	
 	switch (Prestige[client])
+	{
+		case 0:
+			return LSPL_Multiplier_0;
+		case 1:
+			return LSPL_Multiplier_1;
+		case 2:
+			return LSPL_Multiplier_2;
+		case 3:
+			return LSPL_Multiplier_3;
+		case 4:
+			return LSPL_Multiplier_4;
+		default:
+			return LSPL_Multiplier_Invalid;
+	}
+	
+	return LSPL_Multiplier_Invalid;
+}
+
+LSPL_Multiplier GetMultiplierByPrestigeData(int prestige_data)
+{	
+	switch (prestige_data)
 	{
 		case 0:
 			return LSPL_Multiplier_0;
@@ -554,16 +712,14 @@ bool CanGainXP(int client)
 	
 	if (UserLevel >= MaxPLL)
 	{
-		if (Verbose)
-			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
 			
 		return false;
 	}
 	
 	if (Prestige[client] >= MaxPL)
 	{
-		if (Verbose)
-			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
+		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
 			
 		return false;
 	}
@@ -621,6 +777,7 @@ void CalculateValues(int client)
 		
 		EmitSoundToClient(client, Sound_LVL);
 		EmitSoundToClient(client, Sound_LVL);
+		
 		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have leveled up!");
 	}
 	
@@ -645,8 +802,8 @@ int GetUserLevel(int client)
 	
 	if (XP[client] < BaseXP)
 		return 0;
-					
-	int result = RoundToFloor( 1 + Logarithm((XP[client] / BaseXP), view_as<float>(multiplier)));
+	
+	int result = GetLevelFromXP(XP[client], multiplier);
 	
 	if (result >= MaxPLL)
 		return MaxPLL;
@@ -654,10 +811,43 @@ int GetUserLevel(int client)
 		return result;
 }
 
-// < -- Unused -- >
-stock int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
+void GetUserPrefixFromData(int prestige, int xp, char[] buffer, int size)
 {
-	return RoundToFloor( 1 + Logarithm(xp / BaseXP, view_as<float>(multiplier)));
+	LSPL_Multiplier Multiplier = GetMultiplierByPrestigeData(prestige);
+	
+	int Level_Buffer = GetLevelFromXP(xp, Multiplier);
+	
+	if (prestige >= MaxPL)
+		Format(buffer, size, "%s", LSPL_Titles[prestige]);
+	else
+		Format(buffer, size, "%s%i", LSPL_Titles[prestige], Level_Buffer);
+}
+
+void GetUserPrefix(int client, char[] buffer, int size, bool rank = false)
+{	
+	if (rank)
+		if (Prestige[client] >= MaxPL)
+			Format(buffer, size, "%s %s", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]]);
+		else
+			Format(buffer, size, "%s %s%i", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]], Level[client]);
+	else
+		if (Prestige[client] >= MaxPL)
+			Format(buffer, size, "%s", LSPL_Titles[Prestige[client]]);
+		else
+			Format(buffer, size, "%s%i", LSPL_Titles[Prestige[client]], Level[client]);
+}
+
+int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
+{
+	if (xp < BaseXP)
+		return 0;
+		
+	int calculated_level = RoundToFloor( 1 + Logarithm(xp / BaseXP, view_as<float>(multiplier)));
+	
+	if (calculated_level > MaxPLL)
+		return MaxPLL;
+	else
+		return calculated_level;
 }
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
