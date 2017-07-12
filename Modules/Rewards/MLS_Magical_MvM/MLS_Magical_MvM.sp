@@ -242,10 +242,10 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 
 bool CanUseSpell(int client, Spell spell)
 {
-	LSRL Rank = MLS_GetUserRank(client);
+	//LSRL Rank = MLS_GetUserRank(client);
 	
-	if (Rank == LSRL_Admin || Rank == LSRL_Tester) //TODO: Limit to Admin after?
-		return true;
+	//if (Rank == LSRL_Admin || Rank == LSRL_Tester)
+	//	return true;
 	
 	switch (spell)
 	{

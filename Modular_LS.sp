@@ -96,7 +96,6 @@ bool InMemberGroup[MAXPLAYERS + 1];
 bool InTesterGroup[MAXPLAYERS + 1];
 
 int XP_Gained[MAXPLAYERS + 1] =  { 0, ... };
-int Prestige_Gained[MAXPLAYERS + 1] =  { 0, ... };
 
 int XP[MAXPLAYERS + 1] =  { -1, ... };
 int Prestige[MAXPLAYERS + 1] =  { -1, ... };
@@ -167,7 +166,7 @@ public void OnPluginStart()
 	
 	RegConsoleCmd("sm_top10", CmdTop10, "Displays Top 10");
 	RegConsoleCmd("sm_rank", CmdRank, "Displays Current Rank");
-	//RegConsoleCmd("sm_session", CmdSession, "Displays Session Data");
+	RegConsoleCmd("sm_session", CmdSession, "Displays Session Data");
 	
 	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
@@ -238,6 +237,13 @@ public Action CmdRank(int client, int args)
 	return Plugin_Handled;
 }
 
+public Action CmdSession(int client, int args)
+{
+	ShowSession(client);
+	
+	return Plugin_Handled;
+}
+
 public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
 {
 	if (strcmp(command, "say") == 0 || strcmp(command, "say_team") == 0)
@@ -247,6 +253,9 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 			
 		if (strcmp(sArgs, "rank") == 0)
 			ShowRank(client);
+			
+		if (strcmp(sArgs, "session") == 0)
+			ShowSession(client);
 	}
 }
 
@@ -394,7 +403,6 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 	
 	XP[client] = 0;
 	Prestige[client]++;
-	Prestige_Gained[client]++;
 	
 	Call_StartForward(PrestigeForward);
 	
@@ -425,6 +433,36 @@ void ShowRank(int client)
 	Format(Select_Query, sizeof Select_Query, "SELECT rank, total FROM (SELECT ROW_NUMBER() OVER (ORDER BY `prestige` DESC, `xp` DESC) AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total, steamid FROM Modular_LS) sub WHERE sub.steamid = '%s'", Client_SteamID64);
 	
 	hDB.Query(SQL_OnShowRank, Select_Query, client);
+}
+
+void ShowSession(int client)
+{
+	char buffer[64];
+	
+	Panel Session = new Panel();
+	
+	Session.SetTitle("Current Session");
+	
+	Session.DrawItem("Name");
+	GetClientName(client, buffer, sizeof buffer);
+	Session.DrawText(buffer);
+	
+	Session.DrawItem("Rank");
+	GetUserPrefix(client, buffer, sizeof buffer, true);
+	Session.DrawText(buffer);
+	
+	Session.DrawItem("XP Gained");
+	Format(buffer, sizeof buffer, "%i", XP_Gained[client]);
+	Session.DrawText(buffer);
+	
+	Session.DrawItem("Session Time");
+	int Client_Time = RoundToNearest(GetClientTime(client));
+	Format(buffer, sizeof buffer, "%ih %im %is", Client_Time / 3600 % 24, Client_Time / 60 % 60, Client_Time % 60);
+	Session.DrawText(buffer);
+	
+	Session.Send(client, VoidMenuHandler, MENU_TIME_FOREVER);
+	
+	delete Session;
 }
 
 public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error, any client)
@@ -477,7 +515,7 @@ public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error
 	
 	char Position[128], Name[32], Prefix[64];
 	
-	int Prestige_Buffer, XP_Buffer;
+	int Prestige_Buffer, XP_Buffer, Index = 1;
 	
 	Top10.SetTitle("Top 10 Ranking");
 	
@@ -489,12 +527,22 @@ public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error
 		
 		GetUserPrefixFromData(Prestige_Buffer, XP_Buffer, Prefix, sizeof Prefix);
 		
-		Format(Position, sizeof Position, "%s - %s", Name, Prefix);
+		if (Index >= 10)
+		{
+			Format(Position, sizeof Position, "%i. %s - %s", Index, Name, Prefix);
+			Top10.DrawText(Position);
+		} else
+		{
+			Format(Position, sizeof Position, "%s - %s", Name, Prefix);
+			Top10.DrawItem(Position);
+		}
 		
-		Top10.DrawItem(Position);
+		Index++;
 	}
 	
 	Top10.Send(client, VoidMenuHandler, MENU_TIME_FOREVER);
+	
+	delete Top10;
 }
 
 public int VoidMenuHandler(Menu menu, MenuAction action, int param1, int param2)
