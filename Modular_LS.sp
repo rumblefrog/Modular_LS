@@ -57,8 +57,8 @@ enum LSRL
 
 enum LSPL_Multiplier
 {
-	float:LSPL_Multiplier_0 = 1.14,
-	float:LSPL_Multiplier_1 = 1.16,
+	float:LSPL_Multiplier_0 = 1.16,
+	float:LSPL_Multiplier_1 = 1.17,
 	float:LSPL_Multiplier_2 = 1.18,
 	float:LSPL_Multiplier_3 = 1.20,
 	float:LSPL_Multiplier_4 = 1.22,
@@ -67,11 +67,11 @@ enum LSPL_Multiplier
 
 char LSPL_Titles[LSPL_Count][] = {
 
+	"F",
 	"D",
 	"C",
 	"B",
 	"A",
-	"H",
 	"S"
 
 };
@@ -170,7 +170,7 @@ public void OnPluginStart()
 	
 	RegAdminCmd("sm_mls_dump", CmdDump, 0, "Dump user data");
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
-	RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: ROOT PERMISSION FOR RELEASE
+	//RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: REMOVE FOR RELEASE
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
 	
 	RegAdminCmd("mls_core_donor_permission", CmdVoid, ADMFLAG_RESERVATION);
