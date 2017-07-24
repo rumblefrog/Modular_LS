@@ -95,14 +95,14 @@ bool IsLoaded[MAXPLAYERS + 1];
 bool InMemberGroup[MAXPLAYERS + 1];
 bool InTesterGroup[MAXPLAYERS + 1];
 
-int XP_Gained[MAXPLAYERS + 1] =  { 0, ... };
+int XP_Gained[MAXPLAYERS + 1];
 
-int XP[MAXPLAYERS + 1] =  { -1, ... };
-int Prestige[MAXPLAYERS + 1] =  { -1, ... };
-int Level[MAXPLAYERS + 1] =  { -1, ... };
+int XP[MAXPLAYERS + 1] = { -1, ... };
+int Prestige[MAXPLAYERS + 1] = { -1, ... };
+int Level[MAXPLAYERS + 1] = { -1, ... };
 
-int XPAtLevel[MAXPLAYERS + 1] =  { -1, ... };
-int XPToNextLevel[MAXPLAYERS + 1] =  { -1, ... };
+int XPAtLevel[MAXPLAYERS + 1] = { -1, ... };
+int XPToNextLevel[MAXPLAYERS + 1] = { -1, ... };
 
 Handle Progression_Hud;
 
@@ -335,6 +335,8 @@ public Action CmdDump(int client, int args)
 	PrintToConsole(client, "<-------------------------->");
 	
 	PrintToConsole(client, "TEST1: %f", XP[client] / BaseXP);
+	PrintToConsole(client, "TEST2: %i", InMemberGroup[client]);
+	PrintToConsole(client, "TEST3: %i", InTesterGroup[client]);
 	
 	return Plugin_Handled;
 }
@@ -569,6 +571,23 @@ public void OnClientPostAdminCheck(int client)
 	WritePackString(pData, Client_SteamID64);
 	
 	hDB.Query(SQL_OnFetchPlayerData, Select_Query, pData);
+}
+
+public void OnClientDisconnect(int client)
+{
+	IsLoaded[client] = false;
+	
+	InMemberGroup[client] = false;
+	InTesterGroup[client] = false;
+	
+	XP_Gained[client] = 0;
+	
+	XP[client] = -1;
+	Prestige[client] = -1;
+	Level[client] = -1;
+	
+	XPAtLevel[client] = -1;
+	XPToNextLevel[client] = -1;
 }
 
 public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
@@ -1011,14 +1030,14 @@ public int SteamWorks_OnClientGroupStatus(int authid, int groupid, bool isMember
 	
 	int iClient = GetUserFromAuthID(authid);	
 	
-	if (iClient == -1)
+	if (iClient == -1 || !IsValidClientExcludeData(iClient))
 		return;
 			
 	if (isMember || isOfficer)
 	{
 		if (groupid == MemberGroupID32)
 			InMemberGroup[iClient] = true;
-		else if (groupid == TesterGroupID32)
+		if (groupid == TesterGroupID32)
 			InTesterGroup[iClient] = true;
 	}
 }
@@ -1029,15 +1048,15 @@ public int Steam_GroupStatusResult(int client, int groupAccountID, bool groupMem
 	
 	if (groupAccountID != MemberGroupID32 && groupAccountID != TesterGroupID32)
 		return;	
-	
-	if (client == -1)
+		
+	if (!IsValidClientExcludeData(client))
 		return;
 			
 	if (groupMember || groupOfficer)
 	{
 		if (groupAccountID == MemberGroupID32)
 			InMemberGroup[client] = true;
-		else if (groupAccountID == TesterGroupID32)
+		if (groupAccountID == TesterGroupID32)
 			InTesterGroup[client] = true;
 	}
 }
