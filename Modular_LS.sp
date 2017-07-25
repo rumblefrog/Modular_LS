@@ -113,6 +113,8 @@ Handle LoadedForward;
 char ProgressBar[MAXPLAYERS + 1][64];
 int colors[MAXPLAYERS + 1][3];
 
+bool DoubleXP;
+
 public Plugin myinfo = 
 {
 	name = "Modular LS",
@@ -172,6 +174,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_mls_debug", CmdToggleDebug, ADMFLAG_CHEATS, "Toggle Console Debugging");
 	//RegAdminCmd("sm_mls_addxp", CmdAddXP, 0, "DEBUG: Add XP"); //TODO: REMOVE FOR RELEASE
 	RegAdminCmd("sm_mls_setprestige", CmdSetPrestige, ADMFLAG_ROOT, "DEBUG: Set Prestige Level");
+	RegAdminCmd("sm_mls_doublexp", CmdDoubleXP, ADMFLAG_ROOT, "Toggle Double XP Session");
 	
 	RegAdminCmd("mls_core_donor_permission", CmdVoid, ADMFLAG_RESERVATION);
 	RegAdminCmd("mls_core_admin_permission", CmdVoid, ADMFLAG_GENERIC);
@@ -240,6 +243,18 @@ public Action CmdRank(int client, int args)
 public Action CmdSession(int client, int args)
 {
 	ShowSession(client);
+	
+	return Plugin_Handled;
+}
+
+public Action CmdDoubleXP(int client, int args)
+{
+	if (DoubleXP)
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Disabled Double XP Session");
+	else
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Eisabled Double XP Session");
+		
+	DoubleXP = !DoubleXP;
 	
 	return Plugin_Handled;
 }
@@ -667,11 +682,17 @@ int GetXPValue(int client, int base_xp)
 	float SessionTime = GetClientTime(client);
 	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + MaxBase);
 	int MaxBonusSession = (60 * 60 * MaxBonusHour);
+	int StandardXP;
 	
 	if (SessionTime >= MaxBonusSession)
-		return RoundToNearest(base_xp * MaxBonusMultiplier);
+		StandardXP = RoundToNearest(base_xp * MaxBonusMultiplier);
 	else
-		return RoundToNearest(base_xp * ((SessionTime / MaxBonusSession) + MaxBase));
+		StandardXP = RoundToNearest(base_xp * ((SessionTime / MaxBonusSession) + MaxBase));
+		
+	if (DoubleXP)
+		return (StandardXP * 2);
+	else
+		return StandardXP;
 }
 
 void AddXPToUser(int client, int xp)
