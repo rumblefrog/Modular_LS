@@ -27,9 +27,11 @@
 
 #define Sound_LVL "ls/lvl.wav"
 #define Sound_Prestige "ls/prestige.wav"
+#define Sound_Alarm "ambient_mp3/alarms/doomsday_lift_alarm.wav"
 
 #define Sound_LVL_Absolute "sound/ls/lvl.wav"
 #define Sound_Prestige_Absolute "sound/ls/prestige.wav"
+#define Sound_Alarm_Absolute "sound/ambient_mp3/alarms/doomsday_lift_alarm.wav"
 
 #define MemberGroupID32 28307369
 #define TesterGroupID32 29292279
@@ -57,11 +59,11 @@ enum LSRL
 
 enum LSPL_Multiplier
 {
-	float:LSPL_Multiplier_0 = 1.16,
-	float:LSPL_Multiplier_1 = 1.17,
-	float:LSPL_Multiplier_2 = 1.18,
-	float:LSPL_Multiplier_3 = 1.20,
-	float:LSPL_Multiplier_4 = 1.22,
+	float:LSPL_Multiplier_0 = 300.0,
+	float:LSPL_Multiplier_1 = 600.0,
+	float:LSPL_Multiplier_2 = 1200.0,
+	float:LSPL_Multiplier_3 = 2400.0,
+	float:LSPL_Multiplier_4 = 4800.0,
 	LSPL_Multiplier_Invalid
 }
 
@@ -192,6 +194,7 @@ public void OnMapStart()
 	
 	PrecacheSound(Sound_LVL, true);
 	PrecacheSound(Sound_Prestige, true);	
+	PrecacheSound(Sound_Alarm, true); //No need to download, already in TF2 assets
 	
 	AddFileToDownloadsTable(Sound_LVL_Absolute);
 	AddFileToDownloadsTable(Sound_Prestige_Absolute);
@@ -250,9 +253,20 @@ public Action CmdSession(int client, int args)
 public Action CmdDoubleXP(int client, int args)
 {
 	if (DoubleXP)
+	{
 		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Disabled Double XP Session");
+		
+		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink} DoubleXP Event was ended by {chartreuse}%N{deeppink}.", client);
+	}
 	else
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Eisabled Double XP Session");
+	{
+		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Enabled Double XP Session");
+		
+		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink} DoubleXP Event was started by {chartreuse}%N{deeppink}.", client);
+		
+		EmitSoundToAll(Sound_Alarm);
+		EmitSoundToAll(Sound_Alarm);
+	}
 		
 	DoubleXP = !DoubleXP;
 	
@@ -844,14 +858,6 @@ void CalculateValues(int client)
 		XPAtLevel[client] = MaxXPAtCurrent;
 		return;
 	}
-		
-	if (XP[client] < BaseXP)
-	{
-		XPToNextLevel[client] = 10;
-		XPAtLevel[client] = 0;
-		
-		return;
-	}
 	
 	if (OriginLevel != -1 && Level[client] > OriginLevel)
 	{
@@ -927,10 +933,7 @@ void GetUserPrefix(int client, char[] buffer, int size, bool rank = false)
 
 int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 {
-	if (xp < BaseXP)
-		return 0;
-		
-	int calculated_level = RoundToFloor( 1 + Logarithm(xp / BaseXP, view_as<float>(multiplier)));
+	int calculated_level = RoundToFloor(xp / view_as<float>(multiplier));
 	
 	if (calculated_level > MaxPLL)
 		return MaxPLL;
@@ -939,8 +942,15 @@ int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
 }
 
 int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
+{	
+	return RoundToCeil(level * view_as<float>(multiplier));
+}
+
+stock int GetXPFromUserLevel(int level, int client)
 {
-	return RoundToCeil(BaseXP * Pow(view_as<float>(multiplier), (level - 1) * 1.0));
+	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(client);
+	
+	return GetXPFromLevel(level, Multiplier);
 }
 
 bool IsValidClient(int iClient, bool bAlive = false)
