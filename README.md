@@ -1,4 +1,4 @@
-# Modular Level System [![Build Status](https://travis-ci.org/RumbleFrog/Modular_LS.svg?branch=master)](https://travis-ci.org/RumbleFrog/Modular_LS)
+# Modular Level System [![Build Status](https://travis-ci.com/RumbleFrog/Modular_LS.svg?token=fzDwLamkGxdhu8zz3Bvs&branch=master)](https://travis-ci.com/RumbleFrog/Modular_LS)
 A modular leveling system
 
 
