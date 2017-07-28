@@ -1,5 +1,5 @@
 # Modular Level System [![Build Status](https://travis-ci.org/RumbleFrog/Modular_LS.svg?branch=master)](https://travis-ci.org/RumbleFrog/Modular_LS)
-One of the simplest broadcasting plugin
+A modular leveling system
 
 
 # Installation
@@ -9,7 +9,7 @@ One of the simplest broadcasting plugin
 
 # Native
 
-- [Include File](https://github.com/RumbleFrog/Transparent-Broadcast/blob/master/include/Modular_LS.inc)
+- [Include File](https://github.com/RumbleFrog/Modular_LS/blob/master/include/Modular_LS.inc)
 
 # Modules
 
