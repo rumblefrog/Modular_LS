@@ -157,21 +157,33 @@ public int MenuMain_Handler(Menu menu, MenuAction action, int client, int item)
 		if (StrEqual(sBuffer, "2"))
 			DisplayMenu(IntroPlay, client, MENU_TIME_FOREVER);
 	}
+	else if (action == MenuAction_Cancel && item == MenuCancel_Exit)
+		DisplaySpellBook(client);
 }
 
 public int MenuAccess_Handler(Menu menu, MenuAction action, int client, int item)
 {
-	if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsClientInGame(client))
-    {
-        DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+	if (action == MenuAction_Select && IsClientInGame(client))
+		DisplaySpellBook(client);
+	else if (action == MenuAction_Cancel && IsClientInGame(client))
+    {      
+        if (item == MenuCancel_ExitBack)
+        	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+        else if (item == MenuCancel_Exit)
+        	DisplaySpellBook(client);
     }
 }
 
 public int MenuPlay_Handler(Menu menu, MenuAction action, int client, int item)
 {
-	if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsClientInGame(client))
+	if (action == MenuAction_Select && IsClientInGame(client))
+		DisplaySpellBook(client);
+	else if (action == MenuAction_Cancel && IsClientInGame(client))
     {
-        DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+        if (item == MenuCancel_ExitBack)
+        	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+        else if (item == MenuCancel_Exit)
+        	DisplaySpellBook(client);
     }
 }
 
