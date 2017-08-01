@@ -823,12 +823,13 @@ bool CanGainXP(int client)
 	
 	if (UserLevel >= MaxPLL)
 	{
-		
 		if (Prestige[client] >= MaxPL) //Allow progressing further but no levels
 			return true;
 		else
 		{
-			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+			if (Verbose)
+				CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+			
 			return false;
 		}
 	}

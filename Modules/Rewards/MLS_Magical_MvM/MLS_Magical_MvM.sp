@@ -35,6 +35,10 @@ bool InfiniteMana[MAXPLAYERS + 1];
 
 Handle ManaHud;
 
+Menu IntroMain;
+Menu IntroAccess;
+Menu IntroPlay;
+
 enum Spell
 {
 	Spell_Fireball,
@@ -89,6 +93,14 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	RegConsoleCmd("sm_spellbook", CmdSpellBook, "Opens Spellbook Menu");
+	RegConsoleCmd("sm_spells", CmdSpellBook, "Opens Spellbook Menu");
+	RegConsoleCmd("sm_spell", CmdSpellBook, "Opens Spellbook Menu");
+	RegConsoleCmd("sm_sb", CmdSpellBook, "Opens Spellbook Menu");
+	RegConsoleCmd("sm_book", CmdSpellBook, "Opens Spellbook Menu");
+	
+	RegConsoleCmd("sm_intro", CmdIntro, "Opens Intro Menu");
+	RegConsoleCmd("sm_welcome", CmdIntro, "Opens Intro Menu");
+	RegConsoleCmd("sm_help", CmdIntro, "Opens Intro Menu");
 	
 	RegConsoleCmd("sm_infinitemana", CmdInfiniteMana, "[Debug] Infinite Mana"); //TODO: SET TO ROOT ONLY
 	
@@ -105,6 +117,77 @@ public void OnPluginStart()
 	CreateTimer(0.5, Timer_ManaHud, _, TIMER_REPEAT);
 	
 	CreateTimer(BaseTime, Timer_Regenerate, _, TIMER_REPEAT);
+	
+	CreateIntroMenu();
+}
+
+void CreateIntroMenu()
+{
+	IntroMain = new Menu(MenuMain_Handler);
+	IntroMain.SetTitle("Welcome to Magical MvM");
+	IntroMain.AddItem("1", "Accessing the spellbook");
+	IntroMain.AddItem("2", "How to play");
+	
+	IntroAccess = new Menu(MenuAccess_Handler);
+	IntroAccess.SetTitle("Accessing the spellbook");
+	IntroAccess.AddItem("1", "You may access the spellbook via !sb");
+	IntroAccess.AddItem("2", "You may also bind 'sm_sb' to a key");
+	IntroAccess.ExitBackButton = true;
+	
+	IntroPlay = new Menu(MenuPlay_Handler);
+	IntroPlay.SetTitle("How to play");
+	IntroPlay.AddItem("1", "As you collect money, you unlock more spells");
+	IntroPlay.AddItem("2", "Each spells cost mana to cast and have a cooldown");
+	IntroPlay.AddItem("3", "As you kill robots, you gain XP, level up, and prestige");
+	IntroPlay.AddItem("4", "As you progress through the levels, your maximum mana gets bigger");
+	IntroPlay.ExitBackButton = true;
+}
+
+public int MenuMain_Handler(Menu menu, MenuAction action, int client, int item)
+{
+	if (action == MenuAction_Select && IsClientInGame(client))
+	{
+		char sBuffer[64];
+		
+		menu.GetItem(item, sBuffer, sizeof sBuffer);
+		
+		if (StrEqual(sBuffer, "1"))
+			DisplayMenu(IntroAccess, client, MENU_TIME_FOREVER);
+			
+		if (StrEqual(sBuffer, "2"))
+			DisplayMenu(IntroPlay, client, MENU_TIME_FOREVER);
+	}
+}
+
+public int MenuAccess_Handler(Menu menu, MenuAction action, int client, int item)
+{
+	if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsClientInGame(client))
+    {
+        DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+    }
+}
+
+public int MenuPlay_Handler(Menu menu, MenuAction action, int client, int item)
+{
+	if (action == MenuAction_Cancel && item == MenuCancel_ExitBack && IsClientInGame(client))
+    {
+        DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+    }
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+}
+
+public Action CmdIntro(int client, int args)
+{
+	if (!IsValidClient(client))
+		return Plugin_Handled;
+		
+	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+	
+	return Plugin_Handled;
 }
 
 public Action CmdSpellBook(int client, int args)
@@ -242,6 +325,9 @@ public int SpellBookCallBack(Menu menu, MenuAction action, int client, int item)
 
 bool CanUseSpell(int client, Spell spell)
 {
+	if (!IsValidClient(client))
+		return false;
+		
 	//LSRL Rank = MLS_GetUserRank(client);
 	
 	//if (Rank == LSRL_Admin || Rank == LSRL_Tester)
