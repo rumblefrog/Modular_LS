@@ -24,6 +24,7 @@
 #define Bar_Fill "█"
 #define Bar_Empty "░"
 
+#define DoubleXPSymbol "ϟ"
 
 #define Sound_LVL "ls/lvl.wav"
 #define Sound_Prestige "ls/prestige.wav"
@@ -200,6 +201,11 @@ public void OnMapStart()
 	AddFileToDownloadsTable(Sound_Prestige_Absolute);
 }
 
+public void OnMapEnd()
+{
+	DoubleXP = false;
+}
+
 public Action Timer_Progression_Hud(Handle hTimer)
 {	
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
@@ -216,10 +222,10 @@ public Action Timer_Progression_Hud(Handle hTimer)
 				else
 				{
 					GenerateProgressBar(XPAtLevel[iClient], XPToNextLevel[iClient], ProgressBar[iClient], sizeof ProgressBar[]);
-					ShowSyncHudText(iClient, Progression_Hud, "[Lvl] %i: %s %i/%i", Level[iClient], ProgressBar[iClient], XPAtLevel[iClient], XPToNextLevel[iClient]);
+					ShowSyncHudText(iClient, Progression_Hud, "[Lvl] %i: %s %i/%i %s", Level[iClient], ProgressBar[iClient], XPAtLevel[iClient], XPToNextLevel[iClient], (DoubleXP ? DoubleXPSymbol : ""));
 				}
 			} else
-				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige");
+				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige: %i XP", XP[iClient]);
 		}
 	}
 }
@@ -585,6 +591,9 @@ public void OnClientPostAdminCheck(int client)
 {
 	if (!IsValidClientExcludeData(client))
 		return;
+		
+	if (!IsClientConnected(client))
+		return;
 	
 	char Select_Query[1024], Client_SteamID64[32];
 	
@@ -814,16 +823,14 @@ bool CanGainXP(int client)
 	
 	if (UserLevel >= MaxPLL)
 	{
-		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
-			
-		return false;
-	}
-	
-	if (Prestige[client] >= MaxPL)
-	{
-		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
-			
-		return false;
+		
+		if (Prestige[client] >= MaxPL) //Allow progressing further but no levels
+			return true;
+		else
+		{
+			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+			return false;
+		}
 	}
 		
 	return true;

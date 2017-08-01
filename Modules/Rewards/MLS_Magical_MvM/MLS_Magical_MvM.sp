@@ -14,7 +14,7 @@
 //#define Bar_Empty "░"
 
 #define Bar_Fill "█"
-#define Bar_Empty "▓"
+#define Bar_Empty "░"
 
 #define ManaSymbol "ϟ"
 
