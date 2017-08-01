@@ -187,11 +187,6 @@ public int MenuPlay_Handler(Menu menu, MenuAction action, int client, int item)
     }
 }
 
-public void OnClientPostAdminCheck(int client)
-{
-	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
-}
-
 public Action CmdIntro(int client, int args)
 {
 	if (!IsValidClient(client))
@@ -581,10 +576,30 @@ public void OnPluginEnd()
 			RemoveShield(i);
 }
 
+public void OnClientPostAdminCheck(int client)
+{
+	DisplayMenu(IntroMain, client, MENU_TIME_FOREVER);
+}
+
+void ResetAllCoolDown()
+{
+	for (int i = 1; i <= MaxClients; i++)
+		for (int j = 0; j <= view_as<int>(Spell_Count); j++)
+			SpellNextUse[i][j] = 0.0;
+}
+
+void ResetUserCoolDown(int client)
+{
+	for (int i = 0; i <= view_as<int>(Spell_Count); i++)
+		SpellNextUse[client][i] = 0.0;
+}
+
 public void OnClientDisconnect(int client)
 {
 	if (IsValidMagic(client))
 		RemoveShield(client);
+		
+	ResetUserCoolDown(client);
 }
 
 void GenerateProgressBar(int value, int base, char[] buffer, int size)

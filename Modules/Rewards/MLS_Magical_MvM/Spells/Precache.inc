@@ -18,4 +18,6 @@ public void OnMapStart()
 	PrecacheSound(EMPSound, true);
 	
 	PrecacheSound(FailSound, true);
+	
+	ResetAllCoolDown();
 }
