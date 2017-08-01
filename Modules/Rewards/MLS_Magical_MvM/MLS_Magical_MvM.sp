@@ -64,10 +64,10 @@ enum Spell_Cost
 
 enum Spell_Cooldown
 {
-	float:Fireball_Cooldown = 2.0,
+	float:Fireball_Cooldown = 1.5,
 	float:Meteorite_Cooldown = 8.0,
 	float:Teleport_Cooldown = 3.0,
-	float:LightningOrb_Cooldown = 4.0,
+	float:LightningOrb_Cooldown = 5.0,
 	float:Shield_Cooldown = 10.0,
 	float:Barricade_Cooldown = 70.0,
 	float:EMP_Cooldown = 120.0
