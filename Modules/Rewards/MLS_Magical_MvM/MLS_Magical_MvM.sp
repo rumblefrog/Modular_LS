@@ -123,25 +123,25 @@ public void OnPluginStart()
 
 void CreateIntroMenu()
 {
-	IntroMain = new Menu(MenuMain_Handler);
-	IntroMain.SetTitle("Welcome to Magical MvM");
-	IntroMain.AddItem("1", "Accessing the spellbook");
-	IntroMain.AddItem("2", "How to play");
-	
-	IntroAccess = new Menu(MenuAccess_Handler);
-	IntroAccess.SetTitle("Accessing the spellbook");
-	IntroAccess.AddItem("1", "You may access the spellbook via !sb");
-	IntroAccess.AddItem("2", "You may also bind 'sm_sb' to a key");
-	IntroAccess.ExitBackButton = true;
-	
-	IntroPlay = new Menu(MenuPlay_Handler);
-	IntroPlay.SetTitle("How to play");
-	IntroPlay.AddItem("1", "As you collect money, you unlock more spells");
-	IntroPlay.AddItem("2", "Each spells cost mana to cast and have a cooldown");
-	IntroPlay.AddItem("3", "As you kill robots, you gain XP, level up, and prestige");
-	IntroPlay.AddItem("4", "As you progress through the levels, your maximum mana gets bigger");
-	IntroPlay.ExitBackButton = true;
-}
+    IntroMain = new Menu(MenuMain_Handler);
+    IntroMain.SetTitle("Welcome to Magical MvM");
+    IntroMain.AddItem("1", "Accessing the spellbook");
+    IntroMain.AddItem("2", "How to play");
+    
+    IntroAccess = new Menu(MenuAccess_Handler);
+    IntroAccess.SetTitle("Accessing the spellbook");
+    IntroAccess.AddItem("1", "Access the spellbook via !sb");
+    IntroAccess.AddItem("2", "Bind 'sm_sb' to a key to make things easier");
+    IntroAccess.ExitBackButton = true;
+    
+    IntroPlay = new Menu(MenuPlay_Handler);
+    IntroPlay.SetTitle("How to play");
+    IntroPlay.AddItem("1", "As you collect money, you unlock more spells");
+    IntroPlay.AddItem("2", "Each spell has a cooldown and costs mana to cast");
+    IntroPlay.AddItem("3", "As you kill robots, you gain XP, level up, and prestige");
+    IntroPlay.AddItem("4", "As you progress through the levels, your maximum mana increases");
+    IntroPlay.ExitBackButton = true;
+} 
 
 public int MenuMain_Handler(Menu menu, MenuAction action, int client, int item)
 {
