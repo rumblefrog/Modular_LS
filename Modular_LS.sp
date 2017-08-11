@@ -936,9 +936,15 @@ void GetUserPrefix(int client, char[] buffer, int size, bool rank = false)
 {	
 	if (rank)
 		if (Prestige[client] >= MaxPL)
-			Format(buffer, size, "%s %s", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]]);
+			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(client))], ""))
+				Format(buffer, size, "%s", LSPL_Titles[Prestige[client]]);
+			else
+				Format(buffer, size, "%s %s", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]]);
 		else
-			Format(buffer, size, "%s %s%i", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]], Level[client]);
+			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(client))], ""))
+				Format(buffer, size, "%s%i", LSPL_Titles[Prestige[client]], Level[client]);
+			else
+				Format(buffer, size, "%s %s%i", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]], Level[client]);
 	else
 		if (Prestige[client] >= MaxPL)
 			Format(buffer, size, "%s", LSPL_Titles[Prestige[client]]);
