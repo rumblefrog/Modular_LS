@@ -2,7 +2,7 @@ int CurrentShield[MAXPLAYERS + 1] =  { INVALID_ENT_REFERENCE, ... };
 
 void CastShield(int client)
 {
-	if (!CanUseSpell(client, Spell_Barricade))
+	if (!CanUseSpell(client, Spell_Shield))
 		return;
 		
 	if (IsValidEntity(CurrentShield[client]))
@@ -11,7 +11,7 @@ void CastShield(int client)
 		return;
 	}
 		
-	if (!DrainSpellMana(client, Spell_Barricade))
+	if (!DrainSpellMana(client, Spell_Shield))
 		return;
 		
 	int shield = CreateEntityByName("entity_medigun_shield");

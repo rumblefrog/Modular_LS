@@ -520,7 +520,7 @@ public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error,
 	
 	char Hex_Name[16], Prefix[64], Client_Name[32];
 	
-	int Pos = results.FetchInt(0);
+	int Pos = results.FetchInt(0); //TODO: Sometimes invalid
 	int Total = results.FetchInt(1);
 	int Hex = GetColorHex(client);
 	

@@ -48,7 +48,7 @@ enum Spell
 	Spell_Shield,
 	Spell_Barricade,
 	Spell_EMP,
-	Spell_Count
+	Spell_Count // < 7
 }
 
 enum Spell_Cost
@@ -102,7 +102,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_welcome", CmdIntro, "Opens Intro Menu");
 	RegConsoleCmd("sm_help", CmdIntro, "Opens Intro Menu");
 	
-	RegConsoleCmd("sm_infinitemana", CmdInfiniteMana, "[Debug] Infinite Mana"); //TODO: SET TO ROOT ONLY
+	RegAdminCmd("sm_infinitemana", CmdInfiniteMana, ADMFLAG_ROOT, "[Debug] Infinite Mana");
 	
 	RegConsoleCmd("sm_mmvm_dump", CmdDump, "Dump user data");
 	
@@ -399,7 +399,7 @@ public Action Timer_Regenerate(Handle timer, any data)
 {
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (IsValidMagic(i))
+		if (IsValidMagic(i) && IsValidClient(i, true))
 		{
 			if (IsAERank(i, 1, 50))
 				AddMana(i, 1);
@@ -584,13 +584,13 @@ public void OnClientPostAdminCheck(int client)
 void ResetAllCoolDown()
 {
 	for (int i = 1; i <= MaxClients; i++)
-		for (int j = 0; j <= view_as<int>(Spell_Count); j++)
+		for (int j = 0; j < view_as<int>(Spell_Count); j++)
 			SpellNextUse[i][j] = 0.0;
 }
 
 void ResetUserCoolDown(int client)
 {
-	for (int i = 0; i <= view_as<int>(Spell_Count); i++)
+	for (int i = 0; i < view_as<int>(Spell_Count); i++)
 		SpellNextUse[client][i] = 0.0;
 }
 

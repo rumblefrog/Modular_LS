@@ -53,5 +53,5 @@ public bool FilterPlayer(int iEntity, any aContentsMask)
 
 public Action Timer_BarricadeExpire(Handle timer, any iEnt)
 {
-	AcceptEntityInput(iEnt, "Kill");
+	if (IsValidEntity(iEnt)) AcceptEntityInput(iEnt, "Kill");
 }
