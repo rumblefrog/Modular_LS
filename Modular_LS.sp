@@ -1120,7 +1120,8 @@ public int GetUserFromAuthID(int authid)
 {
     for (int i = 1; i <= MaxClients; i++)
     {
-        if(IsClientInGame(i)) {
+        if(IsClientInGame(i))
+        {
             char charauth[64];
             GetClientAuthId(i, AuthId_Steam3, charauth, sizeof(charauth));
                
