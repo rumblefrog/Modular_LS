@@ -13,7 +13,7 @@ void CastEMP(int client)
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientConnected(i) && IsFakeClient(i))
-			TF2_AddCondition(i, TFCond_MVMBotRadiowave, 15.0, client);
+			TF2_AddCondition(i, TFCond_MVMBotRadiowave, 7.0, client);
 	}
 	
 	int particle = CreateEntityByName("info_particle_system");
