@@ -467,7 +467,11 @@ void ShowRank(int client)
 	
 	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
-	Format(Select_Query, sizeof Select_Query, "SELECT rank, total FROM (SELECT ROW_NUMBER() OVER (ORDER BY `prestige` DESC, `xp` DESC) AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total, steamid FROM Modular_LS) sub WHERE sub.steamid = '%s'", Client_SteamID64);
+	// MariaDB 10.x OR MySQL 8.x above only
+	// Format(Select_Query, sizeof Select_Query, "SELECT rank, total FROM (SELECT ROW_NUMBER() OVER (ORDER BY `prestige` DESC, `xp` DESC) AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total, steamid FROM Modular_LS) sub WHERE sub.steamid = '%s'", Client_SteamID64);
+	
+	// MariaDB 10.x OR MySQL 8.x below only
+	Format(Select_Query, sizeof Select_Query, "SELECT sub.rank, sub.total FROM (SELECT t.id, t.steamid, @rownum := @rownum + 1 AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total FROM Modular_LS t JOIN (SELECT @rownum := 0) r ORDER BY t.prestige DESC, t.xp DESC) sub WHERE sub.steamid = '%s'", Client_SteamID64);
 	
 	hDB.Query(SQL_OnShowRank, Select_Query, client);
 }
