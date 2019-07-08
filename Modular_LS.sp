@@ -158,6 +158,8 @@ enum struct Player {
 
 Player g_pPlayers[MAXPLAYERS + 1];
 
+#define LOOP_CLIENTS(%1) for (int %1=0; %1 <= MaxClients; %1++)
+
 public Plugin myinfo = 
 {
 	name = "Modular LS",
@@ -248,7 +250,7 @@ public void OnMapEnd()
 
 public Action Timer_Progression_Hud(Handle hTimer)
 {	
-	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	LOOP_CLIENTS(iClient)
 	{
 		if (IsValidClient(iClient))
 		{
@@ -1135,7 +1137,7 @@ public void Steam_GroupStatusResult(int iClient, int groupAccountID, bool groupM
 
 public int GetUserFromAuthID(int authid)
 {
-    for (int i = 1; i <= MaxClients; i++)
+    LOOP_CLIENTS(i)
     {
         if(IsClientInGame(i))
         {
