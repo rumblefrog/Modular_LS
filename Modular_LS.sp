@@ -1,7 +1,7 @@
 #pragma semicolon 1
 
 #define PLUGIN_AUTHOR "Fishy"
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "2.0.0"
 
 #include <sourcemod>
 #include <sdktools>
@@ -89,23 +89,22 @@ char LSRL_Titles[LSRL_Count][] = {
 
 };
 
+// Prestige is 0 indexed
+int g_iPrestigeColors[MaxPL + 1][3] = {
+	{ 211, 218, 229 },
+	{ 50,  10,  141 },
+	{ 184, 134, 11 },
+	{ 14,  237, 199 },
+	{ 158, 20,  20 },
+	{ 211, 44,  230 },
+};
+
+int g_iPrestigeDefaultColor[3] = { 211, 211, 211 };
+
 //<!-- Main -->
 Database hDB;
 
 bool Verbose;
-bool IsLoaded[MAXPLAYERS + 1];
-
-bool InMemberGroup[MAXPLAYERS + 1];
-bool InTesterGroup[MAXPLAYERS + 1];
-
-int XP_Gained[MAXPLAYERS + 1];
-
-int XP[MAXPLAYERS + 1] = { -1, ... };
-int Prestige[MAXPLAYERS + 1] = { -1, ... };
-int Level[MAXPLAYERS + 1] = { -1, ... };
-
-int XPAtLevel[MAXPLAYERS + 1] = { -1, ... };
-int XPToNextLevel[MAXPLAYERS + 1] = { -1, ... };
 
 Handle Progression_Hud;
 
@@ -113,10 +112,51 @@ Handle LevelForward;
 Handle PrestigeForward;
 Handle LoadedForward;
 
-char ProgressBar[MAXPLAYERS + 1][64];
-int colors[MAXPLAYERS + 1][3];
-
 bool DoubleXP;
+
+enum struct Player {
+	bool bIsLoaded;
+
+	bool bInMemberGroup;
+	bool bInTesterGroup;
+
+	int iXPGained;
+	int iXP;
+	int iPrestige;
+	int iLevel;
+
+	int iXPAtLevel;
+	int iXPToNextLevel;
+
+	char sProgressBar[64];
+
+	int iColors[3];
+
+	void UpdateColors() {
+		if (this.iPrestige > MaxPL) {
+			this.iColors[0] = g_iPrestigeDefaultColor[0];
+			this.iColors[1] = g_iPrestigeDefaultColor[1];
+			this.iColors[2] = g_iPrestigeDefaultColor[2];
+
+			return;
+		}
+
+		this.iColors[0] = g_iPrestigeColors[this.iPrestige][0];
+		this.iColors[1] = g_iPrestigeColors[this.iPrestige][1];
+		this.iColors[2] = g_iPrestigeColors[this.iPrestige][2];
+	}
+
+	// Incase we don't want foreign plugins to modify it
+	void CloneColors(iColors[3]) {
+		this.UpdateColors();
+
+		iColors[0] = this.iColors[0];
+		iColors[1] = this.iColors[1];
+		iColors[2] = this.iColors[2];
+	}
+}
+
+Player g_pPlayers[MAXPLAYERS + 1];
 
 public Plugin myinfo = 
 {
@@ -194,7 +234,7 @@ public void OnMapStart()
 	CreateTimer(0.5, Timer_Progression_Hud, _, TIMER_REPEAT);
 	
 	PrecacheSound(Sound_LVL, true);
-	PrecacheSound(Sound_Prestige, true);	
+	PrecacheSound(Sound_Prestige, true);
 	PrecacheSound(Sound_Alarm, true); //No need to download, already in TF2 assets
 	
 	AddFileToDownloadsTable(Sound_LVL_Absolute);
@@ -212,63 +252,64 @@ public Action Timer_Progression_Hud(Handle hTimer)
 	{
 		if (IsValidClient(iClient))
 		{
-			GetColorRGB(colors[iClient], iClient);
-			SetHudTextParams(0.05, 0.10, 0.6, 0, colors[iClient][0], colors[iClient][1], colors[iClient][2], 0);
+			g_pPlayers[iClient].UpdateColors();
+
+			SetHudTextParams(0.05, 0.10, 0.6, 0, g_pPlayers[iClient].iColors[0], g_pPlayers[iClient].iColors[1], g_pPlayers[iClient].iColors[2], 0);
 					
-			if (Prestige[iClient] != MaxPL)
+			if (g_pPlayers[iClient].iPrestige != MaxPL)
 			{
-				if (Level[iClient] == -1 || XPAtLevel[iClient] == -1 || XPToNextLevel[iClient] == -1)
+				if (g_pPlayers[iClient].iLevel == -1 || g_pPlayers[iClient].iXPAtLevel == -1 || g_pPlayers[iClient].iXPToNextLevel == -1)
 					ShowSyncHudText(iClient, Progression_Hud, "N/A");
 				else
 				{
-					GenerateProgressBar(XPAtLevel[iClient], XPToNextLevel[iClient], ProgressBar[iClient], sizeof ProgressBar[]);
-					ShowSyncHudText(iClient, Progression_Hud, "[Lvl] %i: %s %i/%i %s", Level[iClient], ProgressBar[iClient], XPAtLevel[iClient], XPToNextLevel[iClient], (DoubleXP ? DoubleXPSymbol : ""));
+					GenerateProgressBar(g_pPlayers[iClient].iXPAtLevel, g_pPlayers[iClient].iXPToNextLevel, g_pPlayers[iClient].sProgressBar, sizeof Player::sProgressBar);
+					ShowSyncHudText(iClient, Progression_Hud, "[Lvl] %i: %s %i/%i %s", g_pPlayers[iClient].iLevel, g_pPlayers[iClient].sProgressBar, g_pPlayers[iClient].iXPAtLevel, g_pPlayers[iClient].iXPToNextLevel, (DoubleXP ? DoubleXPSymbol : ""));
 				}
 			} else
-				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige: %i XP", XP[iClient]);
+				ShowSyncHudText(iClient, Progression_Hud, "Reached Max Prestige: %i XP", g_pPlayers[iClient].iXP);
 		}
 	}
 }
 
-public Action CmdVoid(int client, int args)
+public Action CmdVoid(int iClient, int args)
 {
 	return Plugin_Handled;
 }
 
-public Action CmdTop10(int client, int args)
+public Action CmdTop10(int iClient, int args)
 {
-	ShowTop10(client);
+	ShowTop10(iClient);
 	
 	return Plugin_Handled;
 }
 
-public Action CmdRank(int client, int args)
+public Action CmdRank(int iClient, int args)
 {
-	ShowRank(client);
+	ShowRank(iClient);
 	
 	return Plugin_Handled;
 }
 
-public Action CmdSession(int client, int args)
+public Action CmdSession(int iClient, int args)
 {
-	ShowSession(client);
+	ShowSession(iClient);
 	
 	return Plugin_Handled;
 }
 
-public Action CmdDoubleXP(int client, int args)
+public Action CmdDoubleXP(int iClient, int args)
 {
 	if (DoubleXP)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Disabled Double XP Session");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Disabled Double XP Session");
 		
-		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink}DoubleXP Event was ended by {chartreuse}%N{deeppink}.", client);
+		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink}DoubleXP Event was ended by {chartreuse}%N{deeppink}.", iClient);
 	}
 	else
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Enabled Double XP Session");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Enabled Double XP Session");
 		
-		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink}DoubleXP Event was started by {chartreuse}%N{deeppink}.", client);
+		CPrintToChatAll("{lightseagreen}[MaxDB] {deeppink}DoubleXP Event was started by {chartreuse}%N{deeppink}.", iClient);
 		
 		EmitSoundToAll(Sound_Alarm);
 		EmitSoundToAll(Sound_Alarm);
@@ -279,45 +320,45 @@ public Action CmdDoubleXP(int client, int args)
 	return Plugin_Handled;
 }
 
-public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
+public void OnClientSayCommand_Post(int iClient, const char[] command, const char[] sArgs)
 {
 	if (strcmp(command, "say") == 0 || strcmp(command, "say_team") == 0)
 	{
 		if (strcmp(sArgs, "top10") == 0)
-			ShowTop10(client);
+			ShowTop10(iClient);
 			
 		if (strcmp(sArgs, "rank") == 0)
-			ShowRank(client);
+			ShowRank(iClient);
 			
 		if (strcmp(sArgs, "session") == 0)
-			ShowSession(client);
+			ShowSession(iClient);
 	}
 }
 
-public Action CmdToggleDebug(int client, int args)
+public Action CmdToggleDebug(int iClient, int args)
 {
 	if (!Verbose)
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Enabled verbose logging");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Enabled verbose logging");
 	else
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Disabled verbose logging");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Disabled verbose logging");
 		
 	Verbose = !Verbose;
 	
 	return Plugin_Handled;
 }
 
-public Action CmdAddXP(int client, int args)
+public Action CmdAddXP(int iClient, int args)
 {
 	if (args < 1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Missing XP");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Missing XP");
 		
 		return Plugin_Handled;
 	}
 	
-	if (!CanGainXP(client))
+	if (!CanGainXP(iClient))
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Cannot gain XP");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Cannot gain XP");
 		
 		return Plugin_Handled;
 	}
@@ -328,20 +369,20 @@ public Action CmdAddXP(int client, int args)
 	
 	int input = StringToInt(buffer);
 	
-	int EXP = GetXPValue(client, input);
+	int EXP = GetXPValue(iClient, input);
 	
-	AddXPToUser(client, EXP);
+	AddXPToUser(iClient, EXP);
 	
-	CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Requested %i XP to be added", EXP);
+	CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Requested %i XP to be added", EXP);
 	
 	return Plugin_Handled;
 }
 
-public Action CmdSetPrestige(int client, int args)
+public Action CmdSetPrestige(int iClient, int args)
 {
 	if (args < 1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Missing Prestige");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Missing Prestige");
 		
 		return Plugin_Handled;
 	}
@@ -352,66 +393,66 @@ public Action CmdSetPrestige(int client, int args)
 	
 	int prestigel = StringToInt(buffer);
 	
-	Prestige[client] = prestigel;
+	g_pPlayers[iClient].iPrestige = prestigel;
 	
 	return Plugin_Handled;
 }
 
-public Action CmdDump(int client, int args)
+public Action CmdDump(int iClient, int args)
 {
-	PrintToConsole(client, "Base: %f", BaseXP);
-	PrintToConsole(client, "XP: %i", XP[client]);
-	PrintToConsole(client, "Prestige: %i", Prestige[client]);
-	PrintToConsole(client, "Prestige Multiplier: %f", view_as<float>(GetMultiplierByPrestige(client)));
-	PrintToConsole(client, "Level: %i", Level[client]);
-	PrintToConsole(client, "XPAtLevel: %i", XPAtLevel[client]);
-	PrintToConsole(client, "XPToNextLevel: %i", XPToNextLevel[client]);
+	PrintToConsole(iClient, "Base: %f", BaseXP);
+	PrintToConsole(iClient, "XP: %i", g_pPlayers[iClient].iXP);
+	PrintToConsole(iClient, "Prestige: %i", g_pPlayers[iClient].iPrestige);
+	PrintToConsole(iClient, "Prestige Multiplier: %f", view_as<float>(GetMultiplierByPrestige(iClient)));
+	PrintToConsole(iClient, "Level: %i", g_pPlayers[iClient].iLevel);
+	PrintToConsole(iClient, "XPAtLevel: %i", g_pPlayers[iClient].iXPAtLevel);
+	PrintToConsole(iClient, "XPToNextLevel: %i", g_pPlayers[iClient].iXPToNextLevel);
 	
-	PrintToConsole(client, "<-------------------------->");
+	PrintToConsole(iClient, "<-------------------------->");
 	
-	PrintToConsole(client, "TEST1: %f", XP[client] / BaseXP);
-	PrintToConsole(client, "TEST2: %i", InMemberGroup[client]);
-	PrintToConsole(client, "TEST3: %i", InTesterGroup[client]);
+	PrintToConsole(iClient, "TEST1: %f", g_pPlayers[iClient].iXP / BaseXP);
+	PrintToConsole(iClient, "TEST2: %i", g_pPlayers[iClient].bInMemberGroup);
+	PrintToConsole(iClient, "TEST3: %i", g_pPlayers[iClient].bInTesterGroup);
 	
 	return Plugin_Handled;
 }
 
-public Action CmdPrestige(int client, int args)
+public Action CmdPrestige(int iClient, int args)
 {
-	if (XP[client] == -1 || Prestige[client] == -1)
+	if (g_pPlayers[iClient].iXP == -1 || g_pPlayers[iClient].iPrestige == -1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}Oops, unable to prestige.");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}Oops, unable to prestige.");
 		
 		return Plugin_Handled;
 	}
 		
 	
-	if (Prestige[client] >= MaxPL)
+	if (g_pPlayers[iClient].iPrestige >= MaxPL)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}You have reached the highest prestige!");
 			
 		return Plugin_Handled;
 	}
 	
-	int UserLevel = GetUserLevel(client);
+	int UserLevel = GetUserLevel(iClient);
 	
 	if (UserLevel != MaxPLL || UserLevel == -1)
 	{
-		CReplyToCommand(client, "{lightseagreen}[MaxDB] {grey}You can only prestige at level %i!", MaxPLL);
+		CReplyToCommand(iClient, "{lightseagreen}[MaxDB] {grey}You can only prestige at level %i!", MaxPLL);
 			
 		return Plugin_Handled;
 	}
 
 	char Update_Query[1024], Client_SteamID64[32];
 	
-	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientAuthId(iClient, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = 0, `prestige`= `prestige` + 1 WHERE `steamid` = '%s'", Client_SteamID64);
 	
 	DataPack pData = CreateDataPack();
 	
 	WritePackCell(pData, GetCmdReplySource());
-	WritePackCell(pData, client);
+	WritePackCell(pData, iClient);
 	
 	hDB.Query(SQL_OnPlayerPrestige, Update_Query, pData);
 	
@@ -423,49 +464,49 @@ public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] 
 	ResetPack(pData);
 	
 	ReplySource CmdOrigin = ReadPackCell(pData);
-	int client = ReadPackCell(pData);
+	int iClient = ReadPackCell(pData);
 	
 	SetCmdReplySource(CmdOrigin);
 	
 	if (results == null)
 	{
-		ReplyToCommand(client, "Fail to prestige, please try again later");
+		ReplyToCommand(iClient, "Fail to prestige, please try again later");
 		return;
 	}
 	
-	EmitSoundToClient(client, Sound_Prestige);
-	EmitSoundToClient(client, Sound_Prestige);
+	EmitSoundToClient(iClient, Sound_Prestige);
+	EmitSoundToClient(iClient, Sound_Prestige);
 	
-	CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have prestiged!");
+	CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}You have prestiged!");
 	
-	XP[client] = 0;
-	Prestige[client]++;
+	g_pPlayers[iClient].iXP = 0;
+	g_pPlayers[iClient].iPrestige++;
 	
 	Call_StartForward(PrestigeForward);
 	
-	Call_PushCell(client);
-	Call_PushCell(0); //Always 0 on prestige "XP[client] = 0;"
-	Call_PushCell(Prestige[client]);
+	Call_PushCell(iClient);
+	Call_PushCell(0); //Always 0 on prestige "g_pPlayers[iClient].iXP = 0;"
+	Call_PushCell(g_pPlayers[iClient].iPrestige);
 	
 	Call_Finish();
 	
-	CalculateValues(client);
+	CalculateValues(iClient);
 }
 
-void ShowTop10(int client)
+void ShowTop10(int iClient)
 {
 	char Select_Query[128];
 	
 	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Modular_LS ORDER BY `prestige` DESC, `xp` DESC LIMIT 10");
 	
-	hDB.Query(SQL_OnShowTop10, Select_Query, client);
+	hDB.Query(SQL_OnShowTop10, Select_Query, iClient);
 }
 
-void ShowRank(int client)
+void ShowRank(int iClient)
 {
 	char Select_Query[512], Client_SteamID64[32];
 	
-	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientAuthId(iClient, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
 	// MariaDB 10.x OR MySQL 8.x above only
 	// Format(Select_Query, sizeof Select_Query, "SELECT rank, total FROM (SELECT ROW_NUMBER() OVER (ORDER BY `prestige` DESC, `xp` DESC) AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total, steamid FROM Modular_LS) sub WHERE sub.steamid = '%s'", Client_SteamID64);
@@ -473,10 +514,10 @@ void ShowRank(int client)
 	// MariaDB 10.x OR MySQL 8.x below only
 	Format(Select_Query, sizeof Select_Query, "SELECT sub.rank, sub.total FROM (SELECT t.id, t.steamid, @rownum := @rownum + 1 AS rank, (SELECT COUNT(*) FROM Modular_LS) AS total FROM Modular_LS t JOIN (SELECT @rownum := 0) r ORDER BY t.prestige DESC, t.xp DESC) sub WHERE sub.steamid = '%s'", Client_SteamID64);
 	
-	hDB.Query(SQL_OnShowRank, Select_Query, client);
+	hDB.Query(SQL_OnShowRank, Select_Query, iClient);
 }
 
-void ShowSession(int client)
+void ShowSession(int iClient)
 {
 	char buffer[64];
 	
@@ -485,37 +526,37 @@ void ShowSession(int client)
 	Session.SetTitle("Current Session");
 	
 	Session.DrawItem("Name");
-	GetClientName(client, buffer, sizeof buffer);
+	GetClientName(iClient, buffer, sizeof buffer);
 	Session.DrawText(buffer);
 	
 	Session.DrawItem("Rank");
-	GetUserPrefix(client, buffer, sizeof buffer, true);
+	GetUserPrefix(iClient, buffer, sizeof buffer, true);
 	Session.DrawText(buffer);
 	
 	Session.DrawItem("XP Gained");
-	Format(buffer, sizeof buffer, "%i", XP_Gained[client]);
+	Format(buffer, sizeof buffer, "%i", g_pPlayers[iClient].iXPGained);
 	Session.DrawText(buffer);
 	
 	Session.DrawItem("Session Time");
-	int Client_Time = RoundToNearest(GetClientTime(client));
+	int Client_Time = RoundToNearest(GetClientTime(iClient));
 	Format(buffer, sizeof buffer, "%ih %im %is", Client_Time / 3600 % 24, Client_Time / 60 % 60, Client_Time % 60);
 	Session.DrawText(buffer);
 	
-	Session.Send(client, VoidMenuHandler, MENU_TIME_FOREVER);
+	Session.Send(iClient, VoidMenuHandler, MENU_TIME_FOREVER);
 	
 	delete Session;
 }
 
-public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error, any client)
+public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error, any iClient)
 {
 	if (results == null)
 	{
 		EL_LogPlugin(LOG_ERROR, "Unable to fetch player rank: %s", error);
 		
-		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Unable to fetch your rank.");
+		CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}Unable to fetch your rank.");
 		
 		if (Verbose)
-			PrintToConsole(client, "Query Error: %s", error);
+			PrintToConsole(iClient, "Query Error: %s", error);
 		
 		return;
 	}
@@ -526,28 +567,28 @@ public void SQL_OnShowRank(Database db, DBResultSet results, const char[] error,
 	
 	int Pos = results.FetchInt(0); //TODO: Sometimes invalid
 	int Total = results.FetchInt(1);
-	int Hex = GetColorHex(client);
+	int Hex = GetColorHex(iClient);
 	
 	IntToString(Hex, Hex_Name, sizeof Hex_Name);
 	
 	CAddColor(Hex_Name, Hex);
 	
-	GetUserPrefix(client, Prefix, sizeof Prefix, true);
-	GetClientName(client, Client_Name, sizeof Client_Name);
+	GetUserPrefix(iClient, Prefix, sizeof Prefix, true);
+	GetClientName(iClient, Client_Name, sizeof Client_Name);
 	
 	CPrintToChatAll("{lightseagreen}[MaxDB] {grey}Player {lightseagreen}[{%s}%s{lightseagreen}] {chartreuse}%s {grey}is rank {aqua}%i {gray}out of {deepskyblue}%i{grey}.", Hex_Name, Prefix, Client_Name, Pos, Total);
 }
 
-public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error, any client)
+public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error, any iClient)
 {
 	if (results == null)
 	{
 		EL_LogPlugin(LOG_ERROR, "Unable to fetch top 10: %s", error);
 		
-		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Unable to fetch top 10 data.");
+		CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}Unable to fetch top 10 data.");
 		
 		if (Verbose)
-			PrintToConsole(client, "Query Error: %s", error);
+			PrintToConsole(iClient, "Query Error: %s", error);
 		
 		return;
 	}
@@ -581,7 +622,7 @@ public void SQL_OnShowTop10(Database db, DBResultSet results, const char[] error
 		Index++;
 	}
 	
-	Top10.Send(client, VoidMenuHandler, MENU_TIME_FOREVER);
+	Top10.Send(iClient, VoidMenuHandler, MENU_TIME_FOREVER);
 	
 	delete Top10;
 }
@@ -591,45 +632,45 @@ public int VoidMenuHandler(Menu menu, MenuAction action, int param1, int param2)
 	
 }
 
-public void OnClientPostAdminCheck(int client)
+public void OnClientPostAdminCheck(int iClient)
 {
-	if (!IsValidClientExcludeData(client))
+	if (!IsValidClientExcludeData(iClient))
 		return;
 		
-	if (!IsClientConnected(client))
+	if (!IsClientConnected(iClient))
 		return;
 	
 	char Select_Query[1024], Client_SteamID64[32];
 	
-	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientAuthId(iClient, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
 	
-	SteamWorks_GetUserGroupStatus(client, MemberGroupID32);
-	SteamWorks_GetUserGroupStatus(client, TesterGroupID32);
+	SteamWorks_GetUserGroupStatus(iClient, MemberGroupID32);
+	SteamWorks_GetUserGroupStatus(iClient, TesterGroupID32);
 	
 	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Modular_LS WHERE `steamid` = '%s'", Client_SteamID64);
 	
 	DataPack pData = CreateDataPack();
-	WritePackCell(pData, client);
+	WritePackCell(pData, iClient);
 	WritePackString(pData, Client_SteamID64);
 	
 	hDB.Query(SQL_OnFetchPlayerData, Select_Query, pData);
 }
 
-public void OnClientDisconnect(int client)
+public void OnClientDisconnect(int iClient)
 {
-	IsLoaded[client] = false;
+	g_pPlayers[iClient].bIsLoaded = false;
 	
-	InMemberGroup[client] = false;
-	InTesterGroup[client] = false;
+	g_pPlayers[iClient].bInMemberGroup = false;
+	g_pPlayers[iClient].bInTesterGroup = false;
 	
-	XP_Gained[client] = 0;
+	g_pPlayers[iClient].iXPGained = 0;
 	
-	XP[client] = -1;
-	Prestige[client] = -1;
-	Level[client] = -1;
+	g_pPlayers[iClient].iXP = -1;
+	g_pPlayers[iClient].iPrestige = -1;
+	g_pPlayers[iClient].iLevel = -1;
 	
-	XPAtLevel[client] = -1;
-	XPToNextLevel[client] = -1;
+	g_pPlayers[iClient].iXPAtLevel = -1;
+	g_pPlayers[iClient].iXPToNextLevel = -1;
 }
 
 public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
@@ -642,71 +683,71 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	
 	ResetPack(pData);
 	
-	int client = ReadPackCell(pData);
+	int iClient = ReadPackCell(pData);
 	
 	if (results.RowCount == 0)
 	{
 		char Client_SteamID64[32], Insert_Query[1024], Client_Name[32], Escaped_Client_Name[65];
 	
 		ReadPackString(pData, Client_SteamID64, sizeof Client_SteamID64);
-		GetClientName(client, Client_Name, sizeof Client_Name);
+		GetClientName(iClient, Client_Name, sizeof Client_Name);
 		db.Escape(Client_Name, Escaped_Client_Name, sizeof Escaped_Client_Name);
 		
 		Format(Insert_Query, sizeof Insert_Query, "INSERT INTO Modular_LS (`steamid`, `name`) VALUES ('%s', '%s')", Client_SteamID64, Escaped_Client_Name);
 		
-		db.Query(SQL_OnCreatePlayerData, Insert_Query, client);
+		db.Query(SQL_OnCreatePlayerData, Insert_Query, iClient);
 		
 		return;
 	}
 	
 	results.FetchRow();
 	
-	XP[client] = results.FetchInt(3);
-	Prestige[client] = results.FetchInt(4);
+	g_pPlayers[iClient].iXP = results.FetchInt(3);
+	g_pPlayers[iClient].iPrestige = results.FetchInt(4);
 	
-	CalculateValues(client);
+	CalculateValues(iClient);
 	
-	IsLoaded[client] = true;
+	g_pPlayers[iClient].bIsLoaded = true;
 	
 	Call_StartForward(LoadedForward);
 	
-	Call_PushCell(client);
+	Call_PushCell(iClient);
 	
 	Call_Finish();
 }
 
-public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any client)
+public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any iClient)
 {
 	if (results == null)
 	{
 		EL_LogPlugin(LOG_ERROR, "Unable to create player data: %s", error);
 		
 		if (Verbose)
-			PrintToConsole(client, "Unable to create player data: %s", error);
+			PrintToConsole(iClient, "Unable to create player data: %s", error);
 	}
 	
-	XP[client] = 0;
-	Prestige[client] = 0;
+	g_pPlayers[iClient].iXP = 0;
+	g_pPlayers[iClient].iPrestige = 0;
 	
-	CalculateValues(client);
+	CalculateValues(iClient);
 	
-	IsLoaded[client] = true;
+	g_pPlayers[iClient].bIsLoaded = true;
 	
 	Call_StartForward(LoadedForward);
 	
-	Call_PushCell(client);
+	Call_PushCell(iClient);
 	
 	Call_Finish();
 }
 
-int GetXPValue(int client, int base_xp)
+int GetXPValue(int iClient, int base_xp)
 {
 	float MaxBase = 1.0;
 	
-	if (InMemberGroup[client])
+	if (g_pPlayers[iClient].bInMemberGroup)
 		MaxBase += 0.2;
 	
-	float SessionTime = GetClientTime(client);
+	float SessionTime = GetClientTime(iClient);
 	float MaxBonusMultiplier = ((MaxBonusHour * 0.5) + MaxBase);
 	int MaxBonusSession = (60 * 60 * MaxBonusHour);
 	int StandardXP;
@@ -722,22 +763,22 @@ int GetXPValue(int client, int base_xp)
 		return StandardXP;
 }
 
-void AddXPToUser(int client, int xp)
+void AddXPToUser(int iClient, int xp)
 {
-	if (!CanGainXP(client))
+	if (!CanGainXP(iClient))
 		return;
 	
 	char Update_Query[1024], Client_SteamID64[32], Client_Name[32], Escaped_Client_Name[65];
 	
-	GetClientAuthId(client, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
-	GetClientName(client, Client_Name, sizeof Client_Name);
+	GetClientAuthId(iClient, AuthId_SteamID64, Client_SteamID64, sizeof Client_SteamID64);
+	GetClientName(iClient, Client_Name, sizeof Client_Name);
 	
 	hDB.Escape(Client_Name, Escaped_Client_Name, sizeof Escaped_Client_Name);
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = `xp` + '%u', `name` = '%s' WHERE `steamid` = '%s'", xp, Escaped_Client_Name, Client_SteamID64);
 	
 	DataPack pData = CreateDataPack();
-	WritePackCell(pData, client);
+	WritePackCell(pData, iClient);
 	WritePackCell(pData, xp);
 	
 	hDB.Query(SQL_OnAddXPToUser, Update_Query, pData);
@@ -746,7 +787,7 @@ void AddXPToUser(int client, int xp)
 public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] error, any pData)
 {
 	ResetPack(pData);
-	int client = ReadPackCell(pData);
+	int iClient = ReadPackCell(pData);
 	int xp = ReadPackCell(pData);
 	
 	if (results == null)
@@ -757,18 +798,18 @@ public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] err
 			PrintToConsole(pData, "Unable to add XP to player: %s", error);
 	}
 	
-	XP[client] += xp;
-	XP_Gained[client] += xp;
+	g_pPlayers[iClient].iXP += xp;
+	g_pPlayers[iClient].iXPGained += xp;
 	
-	CalculateValues(client);
+	CalculateValues(iClient);
 }
 
-LSPL_Multiplier GetMultiplierByPrestige(int client)
+LSPL_Multiplier GetMultiplierByPrestige(int iClient)
 {
-	if (!IsValidClient(client))
+	if (!IsValidClient(iClient))
 		return LSPL_Multiplier_Invalid;
 	
-	switch (Prestige[client])
+	switch (g_pPlayers[iClient].iPrestige)
 	{
 		case 0:
 			return LSPL_Multiplier_0;
@@ -783,8 +824,6 @@ LSPL_Multiplier GetMultiplierByPrestige(int client)
 		default:
 			return LSPL_Multiplier_Invalid;
 	}
-	
-	return LSPL_Multiplier_Invalid;
 }
 
 LSPL_Multiplier GetMultiplierByPrestigeData(int prestige_data)
@@ -804,35 +843,33 @@ LSPL_Multiplier GetMultiplierByPrestigeData(int prestige_data)
 		default:
 			return LSPL_Multiplier_Invalid;
 	}
-	
-	return LSPL_Multiplier_Invalid;
 }
 
-bool CanGainXP(int client)
+bool CanGainXP(int iClient)
 {
-	if (XP[client] == -1 || Prestige[client] == -1)
+	if (g_pPlayers[iClient].iXP == -1 || g_pPlayers[iClient].iPrestige == -1)
 		return false;
 		
-	int UserLevel = GetUserLevel(client);
+	int UserLevel = GetUserLevel(iClient);
 	
 	if (UserLevel == -1)
 	{
 		if (Verbose)
-			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Invalid Level.");
+			CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}Invalid Level.");
 			
 		return false;
 	}
 	
-	CalculateValues(client);
+	CalculateValues(iClient);
 	
 	if (UserLevel >= MaxPLL)
 	{
-		if (Prestige[client] >= MaxPL) //Allow progressing further but no levels
+		if (g_pPlayers[iClient].iPrestige >= MaxPL) //Allow progressing further but no levels
 			return true;
 		else
 		{
 			if (Verbose)
-				CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
+				CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}In order to earn more levels, prestige first!");
 			
 			return false;
 		}
@@ -841,82 +878,82 @@ bool CanGainXP(int client)
 	return true;
 }
 
-void CalculateValues(int client)
+void CalculateValues(int iClient)
 {
-	int OriginLevel = Level[client];
+	int OriginLevel = g_pPlayers[iClient].iLevel;
 	
-	Level[client] = GetUserLevel(client);
+	g_pPlayers[iClient].iLevel = GetUserLevel(iClient);
 	
-	if (Level[client] == -1)
+	if (g_pPlayers[iClient].iLevel == -1)
 	{
-		XPToNextLevel[client] = -1;
-		XPAtLevel[client] = -1;
+		g_pPlayers[iClient].iXPToNextLevel = -1;
+		g_pPlayers[iClient].iXPAtLevel = -1;
 		return;
 	}
 	
-	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(client);
+	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(iClient);
 	
 	if (Multiplier == LSPL_Multiplier_Invalid)
 	{
-		XPToNextLevel[client] = -1;
-		XPAtLevel[client] = -1;
+		g_pPlayers[iClient].iXPToNextLevel = -1;
+		g_pPlayers[iClient].iXPAtLevel = -1;
 		return;
 	}
 	
-	if (Level[client] >= MaxPLL)
+	if (g_pPlayers[iClient].iLevel >= MaxPLL)
 	{
 		int MaxXPAtCurrent = GetXPFromLevel(MaxPLL, Multiplier);
-		XPToNextLevel[client] = MaxXPAtCurrent;
-		XPAtLevel[client] = MaxXPAtCurrent;
+		g_pPlayers[iClient].iXPToNextLevel = MaxXPAtCurrent;
+		g_pPlayers[iClient].iXPAtLevel = MaxXPAtCurrent;
 		return;
 	}
 	
-	if (XP[client] < BaseXP)		
+	if (g_pPlayers[iClient].iXP < BaseXP)		
 	{		
-		XPToNextLevel[client] = 10;		
-		XPAtLevel[client] = 0;
+		g_pPlayers[iClient].iXPToNextLevel = 10;		
+		g_pPlayers[iClient].iXPAtLevel = 0;
 		return;
 	}
 	
-	if (OriginLevel != -1 && Level[client] > OriginLevel)
+	if (OriginLevel != -1 && g_pPlayers[iClient].iLevel > OriginLevel)
 	{
 		Call_StartForward(LevelForward);
 		
-		Call_PushCell(client);
-		Call_PushCell(Level[client]);
-		Call_PushCell(Prestige[client]);
+		Call_PushCell(iClient);
+		Call_PushCell(g_pPlayers[iClient].iLevel);
+		Call_PushCell(g_pPlayers[iClient].iPrestige);
 		
 		Call_Finish();
 		
-		EmitSoundToClient(client, Sound_LVL);
-		EmitSoundToClient(client, Sound_LVL);
+		EmitSoundToClient(iClient, Sound_LVL);
+		EmitSoundToClient(iClient, Sound_LVL);
 		
-		CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}You have leveled up!");
+		CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}You have leveled up!");
 	}
 	
-	int CurrentLevelXPBuffer = GetXPFromLevel(Level[client], Multiplier);
-	int NextLevel = Level[client] + 1;
+	int CurrentLevelXPBuffer = GetXPFromLevel(g_pPlayers[iClient].iLevel, Multiplier);
+	int NextLevel = g_pPlayers[iClient].iLevel + 1;
 	int NextLevelBuffer = GetXPFromLevel(NextLevel, Multiplier);
 	
-	XPToNextLevel[client] = NextLevelBuffer - CurrentLevelXPBuffer;
-	XPAtLevel[client] = XP[client] - CurrentLevelXPBuffer;
+	g_pPlayers[iClient].iXPToNextLevel = NextLevelBuffer - CurrentLevelXPBuffer;
+	g_pPlayers[iClient].iXPAtLevel = g_pPlayers[iClient].iXP - CurrentLevelXPBuffer;
 }
 
-int GetUserLevel(int client)
+int GetUserLevel(int iClient)
 {
-	LSPL_Multiplier multiplier = GetMultiplierByPrestige(client);
+	LSPL_Multiplier multiplier = GetMultiplierByPrestige(iClient);
 	
 	if (multiplier == LSPL_Multiplier_Invalid)
 	{
 		if (Verbose)
-			CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}Received Invalid Multiplier.");
+			CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}Received Invalid Multiplier.");
 		return -1;
 	}
 	
-	if (XP[client] < BaseXP)
+	if (g_pPlayers[iClient].iXP < BaseXP)
 		return 0;
 	
-	int result = GetLevelFromXP(XP[client], multiplier);
+	int result = GetLevelFromXP(g_pPlayers[iClient].iXP, multiplier);
 	
 	if (result >= MaxPLL)
 		return MaxPLL;
@@ -936,24 +973,24 @@ void GetUserPrefixFromData(int prestige, int xp, char[] buffer, int size)
 		Format(buffer, size, "%s%i", LSPL_Titles[prestige], Level_Buffer);
 }
 
-void GetUserPrefix(int client, char[] buffer, int size, bool rank = false)
+void GetUserPrefix(int iClient, char[] buffer, int size, bool rank = false)
 {	
 	if (rank)
-		if (Prestige[client] >= MaxPL)
-			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(client))], ""))
-				Format(buffer, size, "%s", LSPL_Titles[Prestige[client]]);
+		if (g_pPlayers[iClient].iPrestige >= MaxPL)
+			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(iClient))], ""))
+				Format(buffer, size, "%s", LSPL_Titles[g_pPlayers[iClient].iPrestige]);
 			else
-				Format(buffer, size, "%s %s", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]]);
+				Format(buffer, size, "%s %s", LSRL_Titles[view_as<int>(GetUserRank(iClient))], LSPL_Titles[g_pPlayers[iClient].iPrestige]);
 		else
-			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(client))], ""))
-				Format(buffer, size, "%s%i", LSPL_Titles[Prestige[client]], Level[client]);
+			if (StrEqual(LSRL_Titles[view_as<int>(GetUserRank(iClient))], ""))
+				Format(buffer, size, "%s%i", LSPL_Titles[g_pPlayers[iClient].iPrestige], g_pPlayers[iClient].iLevel);
 			else
-				Format(buffer, size, "%s %s%i", LSRL_Titles[view_as<int>(GetUserRank(client))], LSPL_Titles[Prestige[client]], Level[client]);
+				Format(buffer, size, "%s %s%i", LSRL_Titles[view_as<int>(GetUserRank(iClient))], LSPL_Titles[g_pPlayers[iClient].iPrestige], g_pPlayers[iClient].iLevel);
 	else
-		if (Prestige[client] >= MaxPL)
-			Format(buffer, size, "%s", LSPL_Titles[Prestige[client]]);
+		if (g_pPlayers[iClient].iPrestige >= MaxPL)
+			Format(buffer, size, "%s", LSPL_Titles[g_pPlayers[iClient].iPrestige]);
 		else
-			Format(buffer, size, "%s%i", LSPL_Titles[Prestige[client]], Level[client]);
+			Format(buffer, size, "%s%i", LSPL_Titles[g_pPlayers[iClient].iPrestige], g_pPlayers[iClient].iLevel);
 }
 
 int GetLevelFromXP(int xp, LSPL_Multiplier multiplier)
@@ -974,16 +1011,16 @@ int GetXPFromLevel(int level, LSPL_Multiplier multiplier)
 	return RoundToCeil(BaseXP * Pow(view_as<float>(multiplier), (level - 1) * 1.0));
 }
 
-stock int GetXPFromUserLevel(int level, int client)
+stock int GetXPFromUserLevel(int level, int iClient)
 {
-	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(client);
+	LSPL_Multiplier Multiplier = GetMultiplierByPrestige(iClient);
 	
 	return GetXPFromLevel(level, Multiplier);
 }
 
 bool IsValidClient(int iClient, bool bAlive = false)
 {
-	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient) && XP[iClient] != -1 && Prestige[iClient] != -1 && (bAlive == false || IsPlayerAlive(iClient)))
+	if (iClient >= 1 && iClient <= MaxClients && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient) && g_pPlayers[iClient].iXP != -1 && g_pPlayers[iClient].iPrestige != -1 && (bAlive == false || IsPlayerAlive(iClient)))
 	{
 		return true;
 	}
@@ -1020,30 +1057,9 @@ void GenerateProgressBar(int value, int base, char[] buffer, int size)
 	}
 }
 
-void GetColorRGB(int color[3], int client)
+int GetColorHex(int iClient)
 {
-	switch (Prestige[client])
-	{
-		case 0:
-			color =  { 211, 218, 229 };
-		case 1:
-			color =  { 50, 10, 141 };
-		case 2:
-			color =  { 184, 134, 11 };
-		case 3:
-			color =  { 14, 237, 199 };
-		case 4:
-			color =  { 158, 20, 20 };
-		case 5:
-			color =  { 211, 44, 230 };
-		default:
-			color =  { 211, 211, 211 };
-	}
-}
-
-int GetColorHex(int client)
-{
-	switch (Prestige[client])
+	switch (g_pPlayers[iClient].iPrestige)
 	{
 		case 0:
 			return 0xd3dae5;
@@ -1060,22 +1076,20 @@ int GetColorHex(int client)
 		default:
 			return 0xd3d3dd;
 	}
-	
-	return 0xd3d3dd;
 }
 
-LSRL GetUserRank(int client)
+LSRL GetUserRank(int iClient)
 {
-	if (CheckCommandAccess(client, "mls_core_admin_permission", ADMFLAG_GENERIC))
+	if (CheckCommandAccess(iClient, "mls_core_admin_permission", ADMFLAG_GENERIC))
 		return LSRL_Admin;
 		
-	if (InTesterGroup[client])
+	if (g_pPlayers[iClient].bInTesterGroup)
 		return LSRL_Tester;
 		
-	if (CheckCommandAccess(client, "mls_core_donor_permission", ADMFLAG_RESERVATION))
+	if (CheckCommandAccess(iClient, "mls_core_donor_permission", ADMFLAG_RESERVATION))
 		return LSRL_Donor;
 		
-	if (InMemberGroup[client])
+	if (g_pPlayers[iClient].bInMemberGroup)
 		return LSRL_Member;
 		
 	return LSRL_Normal;
@@ -1095,28 +1109,27 @@ public int SteamWorks_OnClientGroupStatus(int authid, int groupid, bool isMember
 	if (isMember || isOfficer)
 	{
 		if (groupid == MemberGroupID32)
-			InMemberGroup[iClient] = true;
+			g_pPlayers[iClient].bInMemberGroup = true;
 		if (groupid == TesterGroupID32)
-			InTesterGroup[iClient] = true;
+			g_pPlayers[iClient].bInTesterGroup = true;
 	}
 }
 
 //In cases where Steamtools is also loaded and Steamworks fails to see the callback
-public int Steam_GroupStatusResult(int client, int groupAccountID, bool groupMember, bool groupOfficer)
+public void Steam_GroupStatusResult(int iClient, int groupAccountID, bool groupMember, bool groupOfficer)
 {
-	
 	if (groupAccountID != MemberGroupID32 && groupAccountID != TesterGroupID32)
 		return;	
 		
-	if (!IsValidClientExcludeData(client))
+	if (!IsValidClientExcludeData(iClient))
 		return;
 			
 	if (groupMember || groupOfficer)
 	{
 		if (groupAccountID == MemberGroupID32)
-			InMemberGroup[client] = true;
+			g_pPlayers[iClient].bInMemberGroup = true;
 		if (groupAccountID == TesterGroupID32)
-			InTesterGroup[client] = true;
+			g_pPlayers[iClient].bInTesterGroup = true;
 	}
 }
 
@@ -1144,40 +1157,40 @@ public int GetUserFromAuthID(int authid)
 public int Native_GetUserLevel(Handle plugin, int numParams)
 {
 	if (numParams < 1)
-		return ThrowNativeError(SP_ERROR_NATIVE, "Missing client parameter");
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing iClient parameter");
 	
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
-	return Level[client];
+	return g_pPlayers[iClient].iLevel;
 }
 
 public int Native_GetUserPrestige(Handle plugin, int numParams)
 {
 	if (numParams < 1)
-		return ThrowNativeError(SP_ERROR_NATIVE, "Missing client parameter");
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing iClient parameter");
 	
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
-	return Prestige[client];
+	return g_pPlayers[iClient].iPrestige;
 }
 
 public int Native_GetUserRank(Handle plugin, int numParams)
 {
 	if (numParams < 1)
-		return ThrowNativeError(SP_ERROR_NATIVE, "Missing client parameter");
+		return ThrowNativeError(SP_ERROR_NATIVE, "Missing iClient parameter");
 	
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
-	return view_as<int>(GetUserRank(client));
+	return view_as<int>(GetUserRank(iClient));
 }
 
 public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
@@ -1185,14 +1198,14 @@ public int Native_GetPrestigeColorRGB(Handle plugin, int numParams)
 	if (numParams < 2)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(2);
+	int iClient = GetNativeCell(2);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 	
 	int color_buffer[3];
 	
-	GetColorRGB(color_buffer, client);
+	g_pPlayers[iClient].CloneColors(color_buffer);
 	
 	SetNativeArray(1, color_buffer, sizeof color_buffer);
 	
@@ -1204,12 +1217,12 @@ public int Native_GetPrestigeColorHex(Handle plugin, int numParams)
 	if (numParams < 1)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 	
-	return GetColorHex(client);
+	return GetColorHex(iClient);
 }
 
 public int Native_GetPrestigeTitle(Handle plugin, int numParams)
@@ -1217,14 +1230,14 @@ public int Native_GetPrestigeTitle(Handle plugin, int numParams)
 	if (numParams < 3)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(3);
+	int iClient = GetNativeCell(3);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	int buffer_size = GetNativeCell(2);
 	
-	SetNativeString(1, LSPL_Titles[Prestige[client]], buffer_size);
+	SetNativeString(1, LSPL_Titles[g_pPlayers[iClient].iPrestige], buffer_size);
 	
 	return 0;
 }
@@ -1234,14 +1247,14 @@ public int Native_GetRankTitle(Handle plugin, int numParams)
 	if (numParams < 3)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(3);
+	int iClient = GetNativeCell(3);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	int buffer_size = GetNativeCell(2);
 	
-	SetNativeString(1, LSRL_Titles[view_as<int>(GetUserRank(client))], buffer_size);
+	SetNativeString(1, LSRL_Titles[view_as<int>(GetUserRank(iClient))], buffer_size);
 	
 	return 0;
 }
@@ -1251,12 +1264,12 @@ public int Native_AddXP(Handle plugin, int numParams)
 	if (numParams < 3)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 	
-	if (!CanGainXP(client))
+	if (!CanGainXP(iClient))
 		return -1;
 		
 	int buffer = GetNativeCell(2);
@@ -1267,9 +1280,9 @@ public int Native_AddXP(Handle plugin, int numParams)
 	bool bonus = GetNativeCell(3);
 		
 	if (bonus)
-		buffer = GetXPValue(client, buffer);
+		buffer = GetXPValue(iClient, buffer);
 	
-	AddXPToUser(client, buffer);
+	AddXPToUser(iClient, buffer);
 	
 	return 1;
 }
@@ -1279,16 +1292,16 @@ public int Native_PrintToClient(Handle plugin, int numParams)
 	if (numParams < 2)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClient(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClient(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	char buffer[254];
 		
 	FormatNativeString(0, 2, 3, sizeof buffer, _, buffer);
 	
-	CPrintToChat(client, "{lightseagreen}[MaxDB] {grey}%s", buffer);
+	CPrintToChat(iClient, "{lightseagreen}[MaxDB] {grey}%s", buffer);
 	
 	return 0;
 }
@@ -1298,10 +1311,10 @@ public int Native_IsLoaded(Handle plugin, int numParams)
 	if (numParams < 1)
 		return ThrowNativeError(SP_ERROR_NATIVE, "Missing parameter(s)");
 		
-	int client = GetNativeCell(1);
+	int iClient = GetNativeCell(1);
 	
-	if (!IsValidClientExcludeData(client))
-		return ThrowNativeError(SP_ERROR_NATIVE, "Client %d is not valid", client);
+	if (!IsValidClientExcludeData(iClient))
+		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
-	return IsLoaded[client];
+	return g_pPlayers[iClient].bIsLoaded;
 }
