@@ -171,7 +171,7 @@ public Plugin myinfo =
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-	hDB.Connect(OnDatabaseConnected, "modular_ls");
+	Database.Connect(OnDatabaseConnected, "modular_ls");
 	
 	RegPluginLibrary("Modular_LS");
 
@@ -191,9 +191,11 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnDatabaseConnected(Database db, const char[] error, any data)
 {
+	hDB = db;
+
 	char TableCreateSQL[] = "CREATE TABLE IF NOT EXISTS `Modular_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(32) NOT NULL , `name` VARCHAR(32) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
 
-	db.SetCharset("utf8mb4");
+	hDB.SetCharset("utf8mb4");
 
 	hDB.Query(OnTableCreate, TableCreateSQL, _, DBPrio_High);
 }
