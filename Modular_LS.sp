@@ -195,6 +195,8 @@ public void OnDatabaseConnected(Database db, const char[] error, any data)
 
 	char TableCreateSQL[] = "CREATE TABLE IF NOT EXISTS `Modular_LS` ( `id` INT NOT NULL AUTO_INCREMENT , `steamid` VARCHAR(32) NOT NULL , `name` VARCHAR(32) NOT NULL , `xp` BIGINT NOT NULL DEFAULT '0' , `prestige` TINYINT NOT NULL DEFAULT '0' , `creation_date` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP , PRIMARY KEY (`id`), INDEX (`prestige`), UNIQUE (`steamid`)) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_general_ci";
 
+	// Note that utf8mb4 is only available for sm10+
+	// https://github.com/alliedmodders/sourcemod/commit/4637cf9221ca3329a6e71b4317839a77e11d88ee
 	hDB.SetCharset("utf8mb4");
 
 	hDB.Query(OnTableCreate, TableCreateSQL, _, DBPrio_High);
