@@ -233,6 +233,9 @@ public void OnPluginStart()
 	LevelForward = CreateGlobalForward("MLS_OnClientLeveledUp", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 	PrestigeForward = CreateGlobalForward("MLS_OnClientPrestige", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 	LoadedForward = CreateGlobalForward("MLS_OnClientDataLoaded", ET_Ignore, Param_Cell);
+
+	HookEvent("player_connect", EventConnect, EventHookMode_Pre);
+	HookEvent("player_disconnect", EventDisconnect, EventHookMode_Pre);
 }
 
 public void OnMapStart()
@@ -664,6 +667,22 @@ public void OnClientPostAdminCheck(int iClient)
 
 public void OnClientDisconnect(int iClient)
 {
+	if (g_pPlayers[iClient].bIsLoaded)
+	{
+		char Hex_Name[16], Prefix[64], Client_Name[32];
+
+		int Hex = GetColorHex(iClient);
+	
+		IntToString(Hex, Hex_Name, sizeof Hex_Name);
+		
+		CAddColor(Hex_Name, Hex);
+		
+		GetUserPrefix(iClient, Prefix, sizeof Prefix, true);
+		GetClientName(iClient, Client_Name, sizeof Client_Name);
+		
+		CPrintToChatAll("{lightseagreen}[MaxDB] {grey}Player {lightseagreen}[{%s}%s{lightseagreen}] {chartreuse}%s {grey}disconnected.", Hex_Name, Prefix, Client_Name);
+	}
+
 	g_pPlayers[iClient].bIsLoaded = false;
 	
 	g_pPlayers[iClient].bInMemberGroup = false;
@@ -720,6 +739,19 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 	Call_PushCell(iClient);
 	
 	Call_Finish();
+
+	char Hex_Name[16], Prefix[64], Client_Name[32];
+	
+	int Hex = GetColorHex(iClient);
+
+	IntToString(Hex, Hex_Name, sizeof Hex_Name);
+	
+	CAddColor(Hex_Name, Hex);
+	
+	GetUserPrefix(iClient, Prefix, sizeof Prefix, true);
+	GetClientName(iClient, Client_Name, sizeof Client_Name);
+	
+	CPrintToChatAll("{lightseagreen}[MaxDB] {grey}Player {lightseagreen}[{%s}%s{lightseagreen}] {chartreuse}%s {grey}connected.", Hex_Name, Prefix, Client_Name);
 }
 
 public void SQL_OnCreatePlayerData(Database db, DBResultSet results, const char[] error, any iClient)
@@ -1158,6 +1190,18 @@ public int GetUserFromAuthID(int authid)
         }
     }
     return -1;
+}
+
+public Action EventConnect(Event event, const char[] name, bool dontBroadcast)
+{
+	// We'll handle the connect/disconnect message later
+	return Plugin_Handled;
+}
+
+public Action EventDisconnect(Event event, const char[] name, bool dontBroadcast)
+{
+	// We'll handle the connect/disconnect message later
+	return Plugin_Handled;
 }
 
 public int Native_GetUserLevel(Handle plugin, int numParams)
