@@ -60,11 +60,11 @@ enum LSRL
 
 enum LSPL_Multiplier
 {
-	float:LSPL_Multiplier_0 = 1.175,
-	float:LSPL_Multiplier_1 = 1.185,
-	float:LSPL_Multiplier_2 = 1.195,
-	float:LSPL_Multiplier_3 = 1.20,
-	float:LSPL_Multiplier_4 = 1.22,
+	LSPL_Multiplier_0 = 1.175,
+	LSPL_Multiplier_1 = 1.185,
+	LSPL_Multiplier_2 = 1.195,
+	LSPL_Multiplier_3 = 1.20,
+	LSPL_Multiplier_4 = 1.22,
 	LSPL_Multiplier_Invalid
 }
 
@@ -458,22 +458,27 @@ public Action CmdPrestige(int iClient, int args)
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = 0, `prestige`= `prestige` + 1 WHERE `steamid` = '%s'", Client_SteamID64);
 	
-	DataPack pData = CreateDataPack();
+	DataPack pData = new DataPack();
 	
-	WritePackCell(pData, GetCmdReplySource());
-	WritePackCell(pData, iClient);
+	pData.WriteCell(GetCmdReplySource());
+	pData.WriteCell(GetClientUserId(iClient));
 	
 	hDB.Query(SQL_OnPlayerPrestige, Update_Query, pData);
 	
 	return Plugin_Handled;
 }
 
-public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] error, any pData)
+public void SQL_OnPlayerPrestige(Database db, DBResultSet results, const char[] error, DataPack pData)
 {
-	ResetPack(pData);
+	pData.Reset();
 	
-	ReplySource CmdOrigin = ReadPackCell(pData);
-	int iClient = ReadPackCell(pData);
+	ReplySource CmdOrigin = pData.ReadCell();
+	int iClient = GetClientOfUserId(pData.ReadCell());
+
+	delete pData;
+
+	if (iClient == 0)
+		return;
 	
 	SetCmdReplySource(CmdOrigin);
 	
@@ -658,9 +663,10 @@ public void OnClientPostAdminCheck(int iClient)
 	
 	Format(Select_Query, sizeof Select_Query, "SELECT * FROM Modular_LS WHERE `steamid` = '%s'", Client_SteamID64);
 	
-	DataPack pData = CreateDataPack();
-	WritePackCell(pData, iClient);
-	WritePackString(pData, Client_SteamID64);
+	DataPack pData = new DataPack();
+
+	pData.WriteCell(GetClientUserId(iClient));
+	pData.WriteString(Client_SteamID64);
 	
 	hDB.Query(SQL_OnFetchPlayerData, Select_Query, pData);
 }
@@ -698,7 +704,7 @@ public void OnClientDisconnect(int iClient)
 	g_pPlayers[iClient].iXPToNextLevel = -1;
 }
 
-public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, any pData)
+public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[] error, DataPack pData)
 {
 	if (results == null)
 	{
@@ -706,9 +712,14 @@ public void SQL_OnFetchPlayerData(Database db, DBResultSet results, const char[]
 		return;
 	}
 	
-	ResetPack(pData);
+	pData.Reset();
 	
-	int iClient = ReadPackCell(pData);
+	int iClient = GetClientOfUserId(pData.ReadCell());
+
+	delete pData;
+
+	if (iClient == 0)
+		return;
 	
 	if (results.RowCount == 0)
 	{
@@ -815,25 +826,32 @@ void AddXPToUser(int iClient, int xp)
 	
 	Format(Update_Query, sizeof Update_Query, "UPDATE Modular_LS SET `xp` = `xp` + '%u', `name` = '%s' WHERE `steamid` = '%s'", xp, Escaped_Client_Name, Client_SteamID64);
 	
-	DataPack pData = CreateDataPack();
-	WritePackCell(pData, iClient);
-	WritePackCell(pData, xp);
+	DataPack pData = new DataPack();
+
+	pData.WriteCell(GetClientUserId(iClient));
+	pData.WriteCell(xp);
 	
 	hDB.Query(SQL_OnAddXPToUser, Update_Query, pData);
 }
 
-public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] error, any pData)
+public void SQL_OnAddXPToUser(Database db, DBResultSet results, const char[] error, DataPack pData)
 {
-	ResetPack(pData);
-	int iClient = ReadPackCell(pData);
-	int xp = ReadPackCell(pData);
+	pData.Reset();
+
+	int iClient = GetClientOfUserId(pData.ReadCell());
+	int xp = pData.ReadCell();
+
+	delete pData;
+
+	if (iClient == 0)
+		return;
 	
 	if (results == null)
 	{
 		EL_LogPlugin(LOG_ERROR, "Unable to add XP to player: %s", error);
 		
 		if (Verbose)
-			PrintToConsole(pData, "Unable to add XP to player: %s", error);
+			PrintToConsole(iClient, "Unable to add XP to player: %s", error);
 	}
 	
 	g_pPlayers[iClient].iXP += xp;
