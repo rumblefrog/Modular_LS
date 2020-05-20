@@ -1230,7 +1230,8 @@ public int Native_GetUserLevel(Handle plugin, int numParams)
 	int iClient = GetNativeCell(1);
 	
 	if (!IsValidClient(iClient))
-		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
+		return -1;
+		// return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	return g_pPlayers[iClient].iLevel;
 }
@@ -1243,7 +1244,8 @@ public int Native_GetUserPrestige(Handle plugin, int numParams)
 	int iClient = GetNativeCell(1);
 	
 	if (!IsValidClient(iClient))
-		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
+		return -1;
+		// return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	return g_pPlayers[iClient].iPrestige;
 }
@@ -1256,7 +1258,8 @@ public int Native_GetUserRank(Handle plugin, int numParams)
 	int iClient = GetNativeCell(1);
 	
 	if (!IsValidClient(iClient))
-		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
+		return -1;
+		// return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 		
 	return view_as<int>(GetUserRank(iClient));
 }
@@ -1335,7 +1338,8 @@ public int Native_AddXP(Handle plugin, int numParams)
 	int iClient = GetNativeCell(1);
 	
 	if (!IsValidClient(iClient))
-		return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
+		return 0;
+		// return ThrowNativeError(SP_ERROR_NATIVE, "iClient %d is not valid", iClient);
 	
 	if (!CanGainXP(iClient))
 		return -1;

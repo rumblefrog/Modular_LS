@@ -104,6 +104,9 @@ public Action RemoveRagedoll(Handle timer, any iEnt)
 
 bool IsLucky(int client)
 {
+	if (!IsValidClient(client))
+		return false;
+
 	int Level = MLS_GetUserLevel(client);
 	
 	int Prestige = MLS_GetUserPrestige(client);
